@@ -38,6 +38,9 @@ jobs:
           --collect-all keyring
           --collect-all vosk
           --collect-all pynput
+          --collect-all pyttsx3
+          --collect-all SpeechRecognition
+          --hidden-import=pyttsx3.drivers.sapi5
           --hidden-import=keyring.backends.Windows
           --hidden-import=onnxruntime
           run_aurix.py

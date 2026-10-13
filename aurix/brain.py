@@ -114,6 +114,7 @@ class AssistantBrain:
     def _respond_ollama(self, prompt: str) -> str:
         base_url = os.getenv("AURIX_OLLAMA_URL", "http://localhost:11434").rstrip("/")
         model = os.getenv("AURIX_OLLAMA_MODEL", "llama3.2")
+        self._ensure_ollama_model(base_url, model)
         messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
         messages.extend(self.history)
         messages.append({"role": "user", "content": prompt})
@@ -174,6 +175,43 @@ class AssistantBrain:
                 "na opção Configurações do AURIX."
             )
         return "Não consigo responder sem um provedor de IA configurado."
+
+    @staticmethod
+    def _ollama_post(base_url: str, endpoint: str, payload: dict, timeout: float) -> dict:
+        request = urllib.request.Request(
+            f"{base_url}/{endpoint.lstrip('/')}",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        if not isinstance(body, dict):
+            raise RuntimeError("O Ollama retornou uma resposta inválida.")
+        if body.get("error"):
+            raise RuntimeError(str(body["error"]))
+        return body
+
+    def _ensure_ollama_model(self, base_url: str, model: str) -> None:
+        """Pull a missing local model through Ollama after the user selected local AI."""
+        try:
+            self._ollama_post(base_url, "api/show", {"model": model}, timeout=12)
+            return
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+        except RuntimeError as exc:
+            if "not found" not in str(exc).casefold() and "does not exist" not in str(exc).casefold():
+                raise
+
+        # Ollama's non-streaming pull endpoint downloads the weights into its own model store.
+        # This can take a while for multi-gigabyte models; it runs on the request worker, not the UI.
+        self._ollama_post(
+            base_url,
+            "api/pull",
+            {"model": model, "stream": False},
+            timeout=1800,
+        )
 
     def _remember(self, role: str, content: str) -> None:
         self.history.append({"role": role, "content": content})

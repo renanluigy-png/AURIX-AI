@@ -42,7 +42,7 @@ Cole sua chave da API no assistente de configuração. A chave é salva no armaz
 
 ### Ollama — local
 
-Instale o [Ollama para Windows](https://ollama.com/download/windows), mantenha-o em execução e baixe um modelo que ofereça suporte a ferramentas, por exemplo llama3.2. A disponibilidade e a velocidade dependem do modelo, da memória e do hardware do PC.
+Instale o [Ollama para Windows](https://ollama.com/download/windows) e mantenha-o em execução. O AURIX verifica o modelo configurado e, se ele ainda não existir no Ollama, solicita o download automaticamente na primeira conversa. O download pode ter vários GB e leva tempo; a velocidade depende da internet, memória e hardware do PC. O aplicativo não instala o runtime do Ollama sem seu consentimento.
 
 ### Voz e privacidade
 
@@ -92,7 +92,7 @@ python -m unittest discover -s tests -v
 
 ## Estado do MVP
 
-Os testes automáticos verificam compilação sintática e a validação de ferramentas. Áudio real, permissões, instalação do Ollama e abertura dos programas precisam ser verificados em um Windows de destino. O reconhecimento por voz depende do microfone e o uso da OpenAI API depende de uma chave válida. A automação foi mantida deliberadamente limitada por segurança.
+Os testes automáticos verificam compilação sintática e a validação de ferramentas. Áudio real, permissões, instalação do Ollama e abertura dos programas precisam ser verificados em um Windows de destino. O modelo de ativação pré-treinado do openWakeWord tem licença CC BY-NC-SA 4.0; antes de redistribuir comercialmente, verifique a licença do modelo ou substitua-o por um modelo com licença adequada. O reconhecimento por voz depende do microfone e o uso da OpenAI API depende de uma chave válida. A automação foi mantida deliberadamente limitada por segurança.
 
 ## Licença
 

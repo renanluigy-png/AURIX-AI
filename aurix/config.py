@@ -143,7 +143,6 @@ def configure_runtime_settings(settings: Settings) -> None:
             secret = keyring.get_password("AURIX AI", "openai_api_key")
             if secret:
                 os.environ["OPENAI_API_KEY"] = secret
-            else:
-                os.environ.pop("OPENAI_API_KEY", None)
         except Exception:
-            os.environ.pop("OPENAI_API_KEY", None)
+            # Keep an explicitly supplied environment/.env key as a development fallback.
+            pass

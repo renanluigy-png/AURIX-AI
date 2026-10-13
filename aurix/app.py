@@ -331,8 +331,9 @@ def main() -> None:
     app.setApplicationName("AURIX AI")
     app.setOrganizationName("AURIX")
     app.setQuitOnLastWindowClosed(False)
+    first_launch = not Settings.load().first_run_complete
     initial_settings = Settings.load()
-    if not initial_settings.first_run_complete:
+    if first_launch:
         SetupDialog(initial_settings).exec()
         initial_settings = Settings.load()
     configure_runtime_settings(initial_settings)
@@ -341,6 +342,18 @@ def main() -> None:
         if not ok:
             logging.warning(message)
     controller = AurixController(app)
+    if first_launch:
+        controller.window.show_hud()
+        if initial_settings.first_run_complete:
+            controller.window.set_response(
+                "AURIX iniciado. Diga “Hey Jarvis” ou digite um pedido. "
+                "Use Ctrl+Alt+Espaço para chamar esta interface novamente."
+            )
+        else:
+            controller.window.set_response(
+                "AURIX iniciado sem concluir a configuração. Abra o menu da bandeja e selecione "
+                "Configurar IA e voz para começar."
+            )
     app.aboutToQuit.connect(controller.shutdown)
     sys.exit(app.exec())
 
