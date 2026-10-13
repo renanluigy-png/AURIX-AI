@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: aurix-windows-installer
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -30,7 +34,7 @@ jobs:
 
       - name: Build self-contained Windows executable
         run: >
-          python -m PyInstaller --noconfirm --clean --onefile --windowed
+          python -m PyInstaller --noconfirm --clean --onedir --contents-directory . --windowed
           --name AURIX-AI
           --collect-all PySide6
           --collect-all openwakeword
