@@ -87,13 +87,12 @@ class VoiceService(QThread):
             model_path = model_dir / "hey_jarvis_v0.1.tflite"
             if not model_path.exists():
                 self.status_changed.emit("Baixando o modelo de ativação pela primeira vez…")
-                wakeword_utils.download_models()
+                wakeword_utils.download_models(model_names=["hey_jarvis_v0.1"])
             if not model_path.exists():
                 candidates = list(model_dir.rglob("*hey*jarvis*.tflite"))
                 if candidates:
                     model_path = candidates[0]
             if not model_path.exists():
-                # The model class also resolves built-in model names to packaged paths.
                 model = Model(wakeword_models=["hey_jarvis"])
             else:
                 model = Model(wakeword_models=[str(model_path)])

@@ -180,7 +180,6 @@ class AurixController(QObject):
     def on_voice_transcript(self, text: str) -> None:
         self.window.show_hud()
         self.window.set_response(f"Você: {text}")
-        # Close the microphone while the request is processed and while the reply is spoken.
         self.voice.set_enabled(False)
         self.handle_request(text, True)
 
@@ -194,6 +193,8 @@ class AurixController(QObject):
     def handle_request(self, text: str, speak_result: bool = False) -> None:
         if self._request_in_flight:
             self.window.set_response("Ainda estou processando o pedido anterior. Tente novamente em instantes.")
+            if speak_result and self.settings.wake_word_enabled:
+                self.voice.set_enabled(True)
             return
         self._request_in_flight = True
         self.window.set_busy(True)

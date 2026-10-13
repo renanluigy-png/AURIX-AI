@@ -12,7 +12,6 @@ from typing import Any
 from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-# Support both launching from the checkout and Windows startup with a different CWD.
 _ENV_FILE = Path.cwd() / ".env"
 if not _ENV_FILE.is_file():
     _ENV_FILE = PROJECT_ROOT / ".env"
@@ -37,7 +36,9 @@ class Settings:
     def load(cls) -> "Settings":
         APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
         try:
-            raw: dict[str, Any] = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+            raw: Any = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+            if not isinstance(raw, dict):
+                raw = {}
         except (OSError, json.JSONDecodeError):
             raw = {}
         allowed = set(cls.__dataclass_fields__)
