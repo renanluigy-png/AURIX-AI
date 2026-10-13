@@ -125,6 +125,9 @@ class AurixController(QObject):
 
         self.window = HUDWindow()
         self.window.command_submitted.connect(self.handle_request)
+        self.window.settings_requested.connect(self._open_setup_dialog)
+        self.window.voice_toggle_requested.connect(self._toggle_voice_from_hud)
+        self.window.set_voice_enabled(self.settings.wake_word_enabled)
 
         self.voice = VoiceService(threshold=self.settings.wake_threshold)
         self.voice.wake_detected.connect(self.on_wake_detected)
@@ -192,7 +195,6 @@ class AurixController(QObject):
     @Slot(str)
     def on_voice_transcript(self, text: str) -> None:
         self.window.show_hud()
-        self.window.set_response(f"Você: {text}")
         self.voice.set_enabled(False)
         self.handle_request(text, True)
 
@@ -210,6 +212,7 @@ class AurixController(QObject):
                 self.voice.set_enabled(True)
             return
         self._request_in_flight = True
+        self.window.append_message("Você", text)
         self.window.set_busy(True)
         self.window.set_status("Processando solicitação…")
         worker = RequestWorker(text, speak_result, self.brain)
@@ -256,11 +259,16 @@ class AurixController(QObject):
         except Exception:
             logging.exception("Text-to-speech failed")
 
+    @Slot()
+    def _toggle_voice_from_hud(self) -> None:
+        self.voice_action.setChecked(not self.voice_action.isChecked())
+
     @Slot(bool)
     def _toggle_voice(self, enabled: bool) -> None:
         self.settings.wake_word_enabled = enabled
         self.settings.save()
         self.voice.set_enabled(enabled)
+        self.window.set_voice_enabled(enabled)
         self.window.set_status(
             "Escuta de ativação ativa." if enabled else "Escuta pausada. O microfone será fechado."
         )
@@ -289,6 +297,7 @@ class AurixController(QObject):
         self.brain = AssistantBrain()
         self.voice.threshold = self.settings.wake_threshold
         self.voice.set_enabled(self.settings.wake_word_enabled)
+        self.window.set_voice_enabled(self.settings.wake_word_enabled)
         if self.settings.start_with_windows:
             ok, message = set_start_with_windows(True)
             if not ok:
