@@ -11,6 +11,8 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
+from aurix.config import APP_DATA_DIR
+
 
 class VoiceService(QThread):
     """Listen for the pre-trained 'Hey Jarvis' phrase and capture one request."""
@@ -83,19 +85,30 @@ class VoiceService(QThread):
             return
 
         try:
-            model_dir = Path(openwakeword.__file__).resolve().parent / "resources" / "models"
-            model_path = model_dir / "hey_jarvis_v0.1.tflite"
+            # Store downloaded models in the user's profile, not inside site-packages.
+            model_dir = APP_DATA_DIR / "models" / "openwakeword"
+            model_dir.mkdir(parents=True, exist_ok=True)
+            model_path = model_dir / "hey_jarvis_v0.1.onnx"
             if not model_path.exists():
                 self.status_changed.emit("Baixando o modelo de ativação pela primeira vez…")
-                wakeword_utils.download_models(model_names=["hey_jarvis_v0.1"])
+                wakeword_utils.download_models(
+                    model_names=["hey_jarvis_v0.1"],
+                    target_directory=str(model_dir),
+                )
             if not model_path.exists():
-                candidates = list(model_dir.rglob("*hey*jarvis*.tflite"))
+                candidates = list(model_dir.rglob("*hey*jarvis*.onnx"))
                 if candidates:
                     model_path = candidates[0]
             if not model_path.exists():
-                model = Model(wakeword_models=["hey_jarvis"])
-            else:
-                model = Model(wakeword_models=[str(model_path)])
+                raise FileNotFoundError(
+                    "Não encontrei o modelo ONNX Hey Jarvis após o download."
+                )
+            model = Model(
+                wakeword_models=[str(model_path)],
+                inference_framework="onnx",
+                melspec_model_path=str(model_dir / "melspectrogram.onnx"),
+                embedding_model_path=str(model_dir / "embedding_model.onnx"),
+            )
         except Exception as exc:
             self.error.emit(
                 "Não consegui inicializar a ativação por voz. Confira a conexão na primeira "
@@ -203,6 +216,7 @@ class VoiceService(QThread):
 
         audio = sr.AudioData(raw_audio, self.SAMPLE_RATE, 2)
         recognizer = sr.Recognizer()
+        recognizer.operation_timeout = 10
         return recognizer.recognize_google(audio, language="pt-BR").strip()
 
     def _transcribe_vosk(self, raw_audio: bytes) -> str:
