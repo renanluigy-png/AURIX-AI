@@ -71,14 +71,14 @@ class Settings:
 
 def _startup_command() -> str:
     """Run the source checkout directly; pythonw keeps a console window hidden."""
+    if getattr(sys, "frozen", False):
+        return f'"{sys.executable}"'
     current = Path(sys.executable)
     windowless = current.with_name("pythonw.exe")
     executable = windowless if sys.platform == "win32" and windowless.exists() else current
     launcher = PROJECT_ROOT / "run_aurix.py"
     if launcher.is_file():
         return f'"{executable}" "{launcher}"'
-    if getattr(sys, "frozen", False):
-        return f'"{sys.executable}"'
     return f'"{executable}" -m aurix'
 
 
