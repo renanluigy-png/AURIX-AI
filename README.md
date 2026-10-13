@@ -52,7 +52,7 @@ Na primeira inicialização, o AURIX tentará baixar os modelos públicos de det
 python -m aurix
 ```
 
-O AURIX deverá aparecer na bandeja do sistema. Use **Hey Jarvis** para chamá-lo por voz ou `Ctrl + Alt + Espaço` para abrir o HUD manualmente. Fechar o HUD apenas o oculta; use **Sair do AURIX** na bandeja para encerrar o processo.
+O AURIX deverá aparecer na bandeja do sistema. Use **Hey Jarvis** para chamá-lo por voz ou `Ctrl + Alt + Espaço` para abrir o HUD manualmente. Fechar o HUD apenas o oculta; use **Sair do AURIX** na bandeja para encerrar o processo. Para ele iniciar junto com o Windows nas próximas sessões, clique com o botão direito no ícone da bandeja e habilite **Iniciar com o Windows**.
 
 ## Configurar a conversa com IA (opcional)
 
@@ -85,6 +85,23 @@ AURIX_OLLAMA_URL=http://localhost:11434
 ```
 
 Com `AURIX_LLM_PROVIDER=auto`, o AURIX tenta OpenAI quando existe uma chave configurada e, caso contrário, usa Ollama. Sem um provedor disponível, os comandos locais continuam ativos e o assistente informa como habilitar conversa com IA.
+
+### Transcrição de voz totalmente local (opcional)
+
+A transcrição padrão usa o Google Speech Recognition após a palavra de ativação. Para processar a transcrição localmente, instale a dependência opcional:
+
+```powershell
+pip install -e ".[offline-speech]"
+```
+
+Baixe um modelo de português compatível no [catálogo de modelos do Vosk](https://alphacephei.com/vosk/models) e configure no arquivo `.env`:
+
+```dotenv
+AURIX_SPEECH_PROVIDER=vosk
+AURIX_VOSK_MODEL_PATH=C:\\caminho\\para\\o\\modelo
+```
+
+A detecção de ativação continua local. O modelo Vosk precisa ser baixado separadamente e usa mais espaço em disco.
 
 ## Privacidade e permissões
 
