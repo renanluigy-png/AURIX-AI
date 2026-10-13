@@ -27,12 +27,12 @@ LOG_PATH = APP_DATA_DIR / "aurix.log"
 class Settings:
     """Persisted, non-secret user preferences."""
 
-    wake_word_enabled: bool = True
+    wake_word_enabled: bool = False
     tts_enabled: bool = True
     start_with_windows: bool = False
     wake_threshold: float = 0.55
     first_run_complete: bool = False
-    llm_provider: str = "openai"
+    llm_provider: str = "ollama"
     ollama_model: str = "llama3.2"
     speech_provider: str = "vosk"
     vosk_model_path: str = ""

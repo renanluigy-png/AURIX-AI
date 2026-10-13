@@ -73,6 +73,13 @@ class VoiceService(QThread):
                 pass
 
     def run(self) -> None:
+        # Do not open a microphone or download voice models until the user has opted in.
+        while not self._stop_event.is_set() and not self.is_enabled():
+            self.status_changed.emit("Ativação por voz desativada · habilite no menu do AURIX")
+            self._enabled_event.wait(0.5)
+        if self._stop_event.is_set():
+            return
+
         try:
             import numpy as np
             import openwakeword
