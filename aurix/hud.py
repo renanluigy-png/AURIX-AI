@@ -259,7 +259,7 @@ class HUDWindow(QMainWindow):
 
         meta = QHBoxLayout()
         meta.setSpacing(7)
-        for label in ("NATURAL LANGUAGE", "LOCAL TOOLS", "PRIVATE BY DESIGN"):
+        for label in ("NATURAL LANGUAGE", "LOCAL TOOLS", "PERMISSION FIRST"):
             chip = QLabel(label)
             chip.setObjectName("metaChip")
             meta.addWidget(chip)

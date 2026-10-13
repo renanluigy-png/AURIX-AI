@@ -34,7 +34,7 @@ jobs:
 
       - name: Build self-contained Windows executable
         run: >
-          python -m PyInstaller --noconfirm --clean --onedir --contents-directory . --windowed
+          python -m PyInstaller --noconfirm --clean --onefile --windowed
           --name AURIX-AI
           --collect-all PySide6
           --collect-all openwakeword
