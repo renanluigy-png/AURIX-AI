@@ -1,149 +1,99 @@
 # AURIX AI
 
-> Assistente pessoal para Windows com ativação por voz, interface HUD futurista e automações locais controladas.
+Assistente pessoal de desktop para Windows, inspirado em interfaces sci-fi, com voz, HUD flutuante e ferramentas locais escolhidas por um modelo de IA.
 
-O **AURIX AI** é um projeto open source em Python que funciona em segundo plano e pode ser chamado por voz ou por atalho global. A interface holográfica aparece sob demanda, sem exigir que uma janela convencional fique aberta.
+## Quero apenas instalar o aplicativo
 
-## Visão do produto
+O AURIX é empacotado para Windows com seu runtime Python e bibliotecas. O computador não precisa ter Git ou Python instalados.
 
-- **Execução em segundo plano:** ícone na bandeja do Windows, sem janela aberta por padrão.
-- **Ativação por voz:** palavra de ativação em inglês **“Hey Jarvis”** (modelo pré-treinado openWakeWord) e atalho `Ctrl + Alt + Espaço`.
-- **Interface HUD:** núcleo animado, status e resposta em uma janela flutuante.
-- **Comandos locais:** abrir aplicativos permitidos, pesquisar na web e consultar data/hora.
-- **Conversa com IA:** OpenAI API ou Ollama local; comandos locais básicos não exigem chave de API.
-- **Segurança por allowlist:** o modelo não recebe acesso arbitrário ao terminal, shell ou arquivos.
-- **Configuração local:** preferências ficam no perfil do usuário; credenciais não são versionadas.
+1. Abra a aba **Actions** deste repositório.
+2. Selecione o workflow **Windows app installer** e abra a execução mais recente concluída com sucesso.
+3. Na seção **Artifacts**, baixe **AURIX-AI-Installer**.
+4. Extraia o ZIP e execute **AURIX-AI-Setup.exe**.
+5. Abra o AURIX pelo atalho criado. Na primeira execução, configure a IA e as opções de voz.
 
-> **Estado do projeto:** primeira base de desenvolvimento. O suporte de voz depende dos dispositivos e permissões do Windows e precisa ser validado no computador de destino. O detector incluído reconhece “Hey Jarvis”; uma palavra de ativação apenas “Jarvis” exigiria um modelo customizado.
+O instalador é construído pelo GitHub Actions; o arquivo de instalação só fica disponível depois de o workflow Windows terminar com sucesso.
 
-## Requisitos
+[Ver os builds do Windows](https://github.com/renanluigy-png/AURIX-AI/actions/workflows/windows-installer.yml)
 
-- Windows 10/11 de 64 bits.
-- Python 3.11 ou 3.12 recomendado.
-- Microfone e saída de áudio para uso por voz.
-- Conexão com internet para transcrição padrão por Google Speech Recognition ou para a OpenAI API. Ollama pode fornecer conversa local.
-- Opcional: [Ollama](https://ollama.com/) com um modelo instalado, ou uma chave da [OpenAI API](https://platform.openai.com/api-keys).
+## O que é o AURIX
 
-## Instalação no Windows
+O AURIX não é apenas um conjunto de respostas predefinidas. Quando um provedor de IA está configurado, o modelo interpreta o pedido em linguagem natural e pode selecionar ferramentas que o próprio aplicativo executa. O resultado dessas ações volta ao modelo para produzir uma resposta contextual.
 
-Abra o PowerShell na pasta onde deseja clonar o projeto:
+Ferramentas incluídas no MVP:
 
-```powershell
+- abrir aplicativos permitidos, como Spotify, WhatsApp, Discord, navegador, VS Code, Calculadora e Explorador;
+- pesquisar na web ou abrir um site HTTP/HTTPS solicitado;
+- consultar data e hora locais;
+- abrir Desktop, Documentos ou Downloads;
+- criar novas notas de texto em Documentos/AURIX Notes.
+
+As ferramentas validam os argumentos e não dão à IA um terminal arbitrário. Enviar mensagens, apagar arquivos, controlar qualquer janela ou executar comandos de shell não estão habilitados neste MVP.
+
+## Primeira configuração
+
+A janela inicial permite escolher como a inteligência será fornecida.
+
+### OpenAI API — online
+
+Cole sua chave da API no assistente de configuração. A chave é salva no armazenamento de credenciais do Windows, não no repositório nem no arquivo de preferências. O uso da API pode gerar custos conforme o modelo e sua conta.
+
+[Gerenciar chaves da OpenAI API](https://platform.openai.com/api-keys)
+
+### Ollama — local
+
+Instale o [Ollama para Windows](https://ollama.com/download/windows), mantenha-o em execução e baixe um modelo que ofereça suporte a ferramentas, por exemplo llama3.2. A disponibilidade e a velocidade dependem do modelo, da memória e do hardware do PC.
+
+### Voz e privacidade
+
+- A detecção da frase de ativação é feita localmente. O modelo pré-treinado incluído reconhece **“Hey Jarvis”**, e não somente “Jarvis”.
+- Para reconhecimento de fala em português sem enviar seu pedido a um serviço externo, escolha **Local**. Na primeira solicitação por voz, o AURIX baixa o modelo Vosk de português (aproximadamente 31 MB) para a pasta de dados do usuário.
+- A opção Google usa um serviço externo para transcrever o áudio capturado depois da ativação.
+- A escuta de ativação pode ser pausada no menu da bandeja. As permissões de microfone são controladas pelo Windows; a configuração inicial fornece um atalho para as opções de privacidade.
+- Fechar o HUD apenas o oculta. Para encerrar o processo, use **Sair do AURIX** no menu da bandeja.
+
+## Controles
+
+- **Ctrl + Alt + Espaço**: abrir o HUD.
+- **Ícone na bandeja**: abrir o HUD, pausar/retomar a escuta, configurar IA/voz, definir inicialização automática ou sair.
+- Ao chamar por voz, o AURIX mostra o HUD, transcreve o pedido, usa ferramentas quando necessário e fala a resposta.
+
+## Desenvolvimento a partir do código-fonte
+
+Somente para quem deseja modificar o código. O usuário do instalador não precisa realizar estes passos.
+
+~~~powershell
 git clone https://github.com/renanluigy-png/AURIX-AI.git
 cd AURIX-AI
-
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-
 python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-Se o PowerShell bloquear a ativação do ambiente, execute apenas para a sessão atual:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-```
-
-Na primeira inicialização, o AURIX tentará baixar os modelos públicos de detecção de palavra de ativação. É necessário ter internet nessa etapa. Depois execute:
-
-```powershell
+pip install -e .
 python -m aurix
-```
+~~~
 
-O AURIX deverá aparecer na bandeja do sistema. Use **Hey Jarvis** para chamá-lo por voz ou `Ctrl + Alt + Espaço` para abrir o HUD manualmente. Fechar o HUD apenas o oculta; use **Sair do AURIX** na bandeja para encerrar o processo. Para ele iniciar junto com o Windows nas próximas sessões, clique com o botão direito no ícone da bandeja e habilite **Iniciar com o Windows**.
+Testes locais:
 
-## Configurar a conversa com IA (opcional)
-
-Copie o exemplo para criar um arquivo local de configuração:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Edite `.env` e escolha uma das opções.
-
-### OpenAI API
-
-```dotenv
-AURIX_LLM_PROVIDER=openai
-OPENAI_API_KEY=coloque_sua_chave_aqui
-AURIX_OPENAI_MODEL=gpt-5-mini
-```
-
-A utilização da API pode gerar custos conforme a sua conta e o modelo escolhido. **Nunca publique o arquivo `.env` nem a chave de API.**
-
-### Ollama local
-
-Instale e inicie o Ollama, baixe um modelo compatível e configure:
-
-```dotenv
-AURIX_LLM_PROVIDER=ollama
-AURIX_OLLAMA_MODEL=llama3.2
-AURIX_OLLAMA_URL=http://localhost:11434
-```
-
-Com `AURIX_LLM_PROVIDER=auto`, o AURIX tenta OpenAI quando existe uma chave configurada e, caso contrário, usa Ollama. Sem um provedor disponível, os comandos locais continuam ativos e o assistente informa como habilitar conversa com IA.
-
-### Transcrição de voz totalmente local (opcional)
-
-A transcrição padrão usa o Google Speech Recognition após a palavra de ativação. Para processar a transcrição localmente, instale a dependência opcional:
-
-```powershell
-pip install -e ".[offline-speech]"
-```
-
-Baixe um modelo de português compatível no [catálogo de modelos do Vosk](https://alphacephei.com/vosk/models) e configure no arquivo `.env`:
-
-```dotenv
-AURIX_SPEECH_PROVIDER=vosk
-AURIX_VOSK_MODEL_PATH=C:\caminho\para\o\modelo
-```
-
-A detecção de ativação continua local. O modelo Vosk precisa ser baixado separadamente e usa mais espaço em disco.
-
-## Privacidade e permissões
-
-- O detector de palavra de ativação processa o fluxo de áudio localmente.
-- Na configuração padrão, **após a ativação**, o áudio da solicitação é enviado ao serviço Google Speech Recognition para transcrição. Não use essa opção se não quiser enviar áudio para um serviço externo; configure o reconhecimento local seguindo a documentação de arquitetura.
-- A chave OpenAI deve ficar apenas no arquivo `.env` local ou em uma variável de ambiente.
-- O AURIX não executa comandos de shell arbitrários gerados por IA. Ações locais passam por um conjunto explícito de comandos.
-- A automação de mensagens, exclusão de arquivos e outras ações sensíveis não faz parte desta primeira base.
-- A permissão de microfone pode ser revogada nas configurações de Privacidade do Windows.
-
-## Comandos de exemplo
-
-- “Abre o Spotify.”
-- “Abre o WhatsApp.”
-- “Abre o VS Code.”
-- “Pesquisa por documentação do Python.”
-- “Que horas são?”
-- Perguntas gerais em português, quando um provedor de IA está configurado.
-
-O nome de ativação pré-treinado é **“Hey Jarvis”**, que pode ser pronunciado com sotaque brasileiro. O reconhecimento do modelo pode variar conforme microfone, ruído e distância.
-
-## Desenvolvimento e testes
-
-```powershell
+~~~powershell
+python -m compileall -q aurix tests
 python -m unittest discover -s tests -v
-python -m compileall aurix
-```
+~~~
 
-Veja [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para arquitetura, decisões e próximos passos.
+## Estrutura
 
-## Roadmap
+- aurix/app.py: ciclo de vida, bandeja, atalho e fila de solicitações.
+- aurix/onboarding.py: primeira configuração, consentimento de voz e provedor da IA.
+- aurix/hud.py: interface futurista flutuante.
+- aurix/voice.py: detecção de ativação e captura/transcrição de áudio.
+- aurix/brain.py: conversa e loop de chamadas de ferramenta para OpenAI/Ollama.
+- aurix/agent_tools.py: catálogo de ferramentas e validação das ações.
+- aurix/commands.py: abertura de aplicativos da lista permitida.
+- aurix/config.py: preferências e configuração de inicialização.
 
-- [x] Estrutura inicial do projeto e documentação.
-- [x] Bandeja do sistema e HUD flutuante.
-- [x] Atalho global e comandos locais restritos.
-- [x] Integrações opcionais com OpenAI e Ollama.
-- [x] Detector local de palavra de ativação e fluxo de voz.
-- [ ] Executar testes de áudio em diferentes dispositivos Windows.
-- [ ] Configuração gráfica da inicialização com Windows e preferências de voz.
-- [ ] Transcrição local integrada de ponta a ponta e pacote instalável.
-- [ ] Testes e2e automatizados e instalador assinado.
+## Estado do MVP
+
+Os testes automáticos verificam compilação sintática e a validação de ferramentas. Áudio real, permissões, instalação do Ollama e abertura dos programas precisam ser verificados em um Windows de destino. O reconhecimento por voz depende do microfone e o uso da OpenAI API depende de uma chave válida. A automação foi mantida deliberadamente limitada por segurança.
 
 ## Licença
 
-Distribuído sob a licença MIT. Consulte [LICENSE](LICENSE).
+MIT. Veja o arquivo LICENSE.

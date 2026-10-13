@@ -31,6 +31,11 @@ class Settings:
     tts_enabled: bool = True
     start_with_windows: bool = False
     wake_threshold: float = 0.55
+    first_run_complete: bool = False
+    llm_provider: str = "openai"
+    ollama_model: str = "llama3.2"
+    speech_provider: str = "vosk"
+    vosk_model_path: str = ""
 
     @classmethod
     def load(cls) -> "Settings":
@@ -72,6 +77,8 @@ def _startup_command() -> str:
     launcher = PROJECT_ROOT / "run_aurix.py"
     if launcher.is_file():
         return f'"{executable}" "{launcher}"'
+    if getattr(sys, "frozen", False):
+        return f'"{sys.executable}"'
     return f'"{executable}" -m aurix'
 
 
@@ -117,3 +124,26 @@ def set_start_with_windows(enabled: bool) -> tuple[bool, str]:
         return True, "Preferência de inicialização atualizada."
     except (OSError, ImportError) as exc:
         return False, f"Não foi possível atualizar a inicialização: {exc}"
+
+
+def configure_runtime_settings(settings: Settings) -> None:
+    """Load preferences and retrieve API credentials from the OS credential store."""
+    os.environ["AURIX_LLM_PROVIDER"] = settings.llm_provider
+    os.environ["AURIX_OLLAMA_MODEL"] = settings.ollama_model or "llama3.2"
+    os.environ["AURIX_SPEECH_PROVIDER"] = settings.speech_provider or "vosk"
+    if settings.vosk_model_path:
+        os.environ["AURIX_VOSK_MODEL_PATH"] = settings.vosk_model_path
+    else:
+        os.environ.pop("AURIX_VOSK_MODEL_PATH", None)
+
+    if settings.llm_provider == "openai":
+        try:
+            import keyring
+
+            secret = keyring.get_password("AURIX AI", "openai_api_key")
+            if secret:
+                os.environ["OPENAI_API_KEY"] = secret
+            else:
+                os.environ.pop("OPENAI_API_KEY", None)
+        except Exception:
+            os.environ.pop("OPENAI_API_KEY", None)

@@ -11,8 +11,16 @@ from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
 from aurix.brain import AssistantBrain
-from aurix.commands import execute_command, parse_command
-from aurix.config import APP_DATA_DIR, LOG_PATH, Settings, is_start_with_windows_enabled, set_start_with_windows
+from aurix.commands import parse_command
+from aurix.config import (
+    APP_DATA_DIR,
+    LOG_PATH,
+    Settings,
+    configure_runtime_settings,
+    is_start_with_windows_enabled,
+    set_start_with_windows,
+)
+from aurix.onboarding import SetupDialog
 from aurix.hud import HUDWindow
 from aurix.voice import VoiceService
 
@@ -58,8 +66,8 @@ class RequestWorker(QRunnable):
     @Slot()
     def run(self) -> None:
         try:
-            parsed = parse_command(self.text)
-            result = execute_command(parsed) if parsed else self.brain.respond(self.text)
+            # The selected model chooses whether to converse or call one of the tools.
+            result = self.brain.respond(self.text)
         except Exception:
             logging.exception("Unhandled error while processing a request")
             result = "Ocorreu um erro inesperado ao processar o pedido. Veja o log local do AURIX."
@@ -108,6 +116,7 @@ class AurixController(QObject):
         super().__init__(app)
         self.app = app
         self.settings = Settings.load()
+        configure_runtime_settings(self.settings)
         self.brain = AssistantBrain()
         self.thread_pool = QThreadPool.globalInstance()
         self.thread_pool.setMaxThreadCount(2)
@@ -157,6 +166,10 @@ class AurixController(QObject):
         self.voice_action.setChecked(self.settings.wake_word_enabled)
         self.voice_action.toggled.connect(self._toggle_voice)
         menu.addAction(self.voice_action)
+
+        setup_action = QAction("Configurar IA e voz…", menu)
+        setup_action.triggered.connect(self._open_setup_dialog)
+        menu.addAction(setup_action)
 
         self.autostart_action = QAction("Iniciar com o Windows", menu)
         self.autostart_action.setCheckable(True)
@@ -266,6 +279,31 @@ class AurixController(QObject):
         self.settings.save()
         self.tray.showMessage("AURIX AI", message, QSystemTrayIcon.MessageIcon.Information, 2500)
 
+    @Slot()
+    def _open_setup_dialog(self) -> None:
+        dialog = SetupDialog(self.settings, self.window)
+        if dialog.exec() != SetupDialog.DialogCode.Accepted:
+            return
+        self.settings = Settings.load()
+        configure_runtime_settings(self.settings)
+        self.brain = AssistantBrain()
+        self.voice.threshold = self.settings.wake_threshold
+        self.voice.set_enabled(self.settings.wake_word_enabled)
+        if self.settings.start_with_windows:
+            ok, message = set_start_with_windows(True)
+            if not ok:
+                self.window.set_status(message)
+        else:
+            set_start_with_windows(False)
+        self.voice_action.blockSignals(True)
+        self.voice_action.setChecked(self.settings.wake_word_enabled)
+        self.voice_action.blockSignals(False)
+        self.autostart_action.blockSignals(True)
+        self.autostart_action.setChecked(self.settings.start_with_windows)
+        self.autostart_action.blockSignals(False)
+        self.window.set_response("Configurações atualizadas.")
+        self.window.set_status("Pronto para ajudar.")
+
     def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason in {
             QSystemTrayIcon.ActivationReason.Trigger,
@@ -293,6 +331,15 @@ def main() -> None:
     app.setApplicationName("AURIX AI")
     app.setOrganizationName("AURIX")
     app.setQuitOnLastWindowClosed(False)
+    initial_settings = Settings.load()
+    if not initial_settings.first_run_complete:
+        SetupDialog(initial_settings).exec()
+        initial_settings = Settings.load()
+    configure_runtime_settings(initial_settings)
+    if initial_settings.start_with_windows:
+        ok, message = set_start_with_windows(True)
+        if not ok:
+            logging.warning(message)
     controller = AurixController(app)
     app.aboutToQuit.connect(controller.shutdown)
     sys.exit(app.exec())

@@ -13,6 +13,8 @@ from PySide6.QtCore import QThread, Signal
 
 from aurix.config import APP_DATA_DIR
 
+from aurix.config import APP_DATA_DIR
+
 
 class VoiceService(QThread):
     """Listen for the pre-trained 'Hey Jarvis' phrase and capture one request."""
@@ -219,17 +221,61 @@ class VoiceService(QThread):
         recognizer.operation_timeout = 10
         return recognizer.recognize_google(audio, language="pt-BR").strip()
 
+    def _ensure_vosk_model(self) -> Path:
+        """Download the small Brazilian Portuguese model into the user data folder."""
+        import shutil
+        import zipfile
+        from urllib.request import urlopen
+
+        configured = os.getenv("AURIX_VOSK_MODEL_PATH", "").strip()
+        if configured and Path(configured).is_dir():
+            return Path(configured)
+
+        model_name = "vosk-model-small-pt-0.3"
+        root = APP_DATA_DIR / "models" / "vosk"
+        model_path = root / model_name
+        if model_path.is_dir():
+            return model_path
+
+        root.mkdir(parents=True, exist_ok=True)
+        archive = root / (model_name + ".zip")
+        url = "https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip"
+        self.status_changed.emit("Baixando modelo de português (~31 MB) para reconhecimento local…")
+        try:
+            with urlopen(url, timeout=45) as response, archive.open("wb") as output:
+                content_length = response.headers.get("Content-Length")
+                if content_length and int(content_length) > 100 * 1024 * 1024:
+                    raise RuntimeError("O tamanho do modelo recebido excede o limite esperado.")
+                shutil.copyfileobj(response, output)
+            with zipfile.ZipFile(archive) as compressed:
+                root_resolved = root.resolve()
+                for member in compressed.infolist():
+                    destination = (root / member.filename).resolve()
+                    if destination != root_resolved and root_resolved not in destination.parents:
+                        raise RuntimeError("O arquivo de modelo contém um caminho inválido.")
+                compressed.extractall(root)
+        except Exception:
+            try:
+                archive.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+        finally:
+            try:
+                archive.unlink(missing_ok=True)
+            except OSError:
+                pass
+        if not model_path.is_dir():
+            raise FileNotFoundError("O download terminou, mas a pasta do modelo não foi encontrada.")
+        os.environ["AURIX_VOSK_MODEL_PATH"] = str(model_path)
+        return model_path
+
     def _transcribe_vosk(self, raw_audio: bytes) -> str:
         import vosk
 
-        model_path = os.getenv("AURIX_VOSK_MODEL_PATH", "").strip()
-        if not model_path or not Path(model_path).is_dir():
-            raise RuntimeError(
-                "Para transcrição offline, instale o extra vosk e configure "
-                "AURIX_VOSK_MODEL_PATH para a pasta de um modelo português."
-            )
+        model_path = self._ensure_vosk_model()
         if self._vosk_model is None:
-            self._vosk_model = vosk.Model(model_path)
+            self._vosk_model = vosk.Model(str(model_path))
         recognizer = vosk.KaldiRecognizer(self._vosk_model, self.SAMPLE_RATE)
         recognizer.AcceptWaveform(raw_audio)
         result = json.loads(recognizer.FinalResult())
