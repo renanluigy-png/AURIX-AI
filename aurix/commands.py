@@ -58,8 +58,8 @@ APP_ALIASES: dict[str, str] = {
 
 APP_TARGETS: dict[str, AppTarget] = {
     "spotify": AppTarget("uri", "spotify:", "https://open.spotify.com/"),
-    "whatsapp": AppTarget("uri", "whatsapp:", "https://web.whatsapp.com/"),
-    "discord": AppTarget("uri", "discord:", "https://discord.com/app"),
+    "whatsapp": AppTarget("uri", "whatsapp://", "https://web.whatsapp.com/"),
+    "discord": AppTarget("uri", "discord://", "https://discord.com/app"),
     "browser": AppTarget("url", "https://www.google.com/"),
     "chrome": AppTarget("executable", "chrome"),
     "edge": AppTarget("executable", "msedge"),
