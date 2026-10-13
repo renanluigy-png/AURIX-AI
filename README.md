@@ -98,7 +98,7 @@ Baixe um modelo de português compatível no [catálogo de modelos do Vosk](http
 
 ```dotenv
 AURIX_SPEECH_PROVIDER=vosk
-AURIX_VOSK_MODEL_PATH=C:\\caminho\\para\\o\\modelo
+AURIX_VOSK_MODEL_PATH=C:\caminho\para\o\modelo
 ```
 
 A detecção de ativação continua local. O modelo Vosk precisa ser baixado separadamente e usa mais espaço em disco.
