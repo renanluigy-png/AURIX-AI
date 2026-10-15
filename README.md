@@ -6,13 +6,11 @@ Assistente pessoal de desktop para Windows, inspirado em interfaces sci-fi, com 
 
 O AURIX é empacotado para Windows com seu runtime Python e bibliotecas. O computador não precisa ter Git ou Python instalados.
 
-1. Abra a aba **Actions** deste repositório.
-2. Selecione o workflow **Windows app installer** e abra a execução mais recente concluída com sucesso.
-3. Na seção **Artifacts**, baixe **AURIX-AI-Installer**.
-4. Extraia o ZIP e execute **AURIX-AI-Setup.exe**.
-5. Abra o AURIX pelo atalho criado. Na primeira execução, configure a IA e as opções de voz.
+1. Abra [Releases](https://github.com/renanluigy-png/AURIX-AI/releases/latest).
+2. Baixe o arquivo `AURIX-AI-Setup.exe` da versão mais recente.
+3. Execute o instalador e siga as etapas.
 
-O instalador é construído pelo GitHub Actions; o arquivo de instalação só fica disponível depois de o workflow Windows terminar com sucesso.
+Depois de instalar uma versão que tenha o atualizador integrado, o AURIX consulta as publicações oficiais ao iniciar. Se houver uma versão mais nova, ele mostra um aviso e oferece baixar e abrir o instalador; a atualização só acontece depois da sua confirmação. É necessário estar conectado à internet. O atualizador aceita somente o endereço oficial e, quando o GitHub fornece SHA-256, verifica o hash antes de abrir o arquivo.
 
 [Ver os builds do Windows](https://github.com/renanluigy-png/AURIX-AI/actions/workflows/windows-installer.yml)
 

@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-installer:
@@ -19,6 +19,87 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set release version
+        id: build_version
+        shell: pwsh
+        run: |
+          $version = "1.$env:GITHUB_RUN_NUMBER.0"
+          $buildInfo = 'APP_VERSION = "' + $version + '"' + [Environment]::NewLine
+          [System.IO.File]::WriteAllText("aurix/build_info.py", $buildInfo, [System.Text.UTF8Encoding]::new($false))
+          $installerScript = Get-Content "installer.iss" -Raw
+          $replacement = '#define MyAppVersion "' + $version + '"'
+          $installerScript = [regex]::Replace($installerScript, '(?m)^#define MyAppVersion ".*"      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install application and packager
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install pyinstaller pyinstaller-hooks-contrib
+
+      - name: Build self-contained Windows executable
+        run: >
+          python -m PyInstaller --noconfirm --clean --onefile --windowed
+          --name AURIX-AI
+          --collect-all PySide6
+          --collect-all openwakeword
+          --collect-all onnxruntime
+          --collect-all keyring
+          --collect-all vosk
+          --collect-all pynput
+          --collect-all pyttsx3
+          --collect-all SpeechRecognition
+          --hidden-import=pyttsx3.drivers.sapi5
+          --hidden-import=keyring.backends.Windows
+          --hidden-import=onnxruntime
+          run_aurix.py
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+          $iscc = Join-Path $programFilesX86 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            throw "Inno Setup compiler not found at $iscc"
+          }
+          & $iscc installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path "dist-installer\AURIX-AI-Setup.exe")) {
+            throw "Installer file was not created."
+          }
+
+      - name: Publish official update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.build_version.outputs.version }}
+          name: AURIX AI v${{ steps.build_version.outputs.version }}
+          body: |
+            Atualização oficial do AURIX AI para Windows (64 bits).
+
+            Baixe e execute AURIX-AI-Setup.exe para atualizar. O aplicativo também detecta esta versão automaticamente na inicialização.
+          draft: false
+          prerelease: false
+          make_latest: true
+          files: dist-installer/AURIX-AI-Setup.exe
+          fail_on_unmatched_files: true
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AURIX-AI-Installer
+          path: dist-installer/AURIX-AI-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+, $replacement)
+          [System.IO.File]::WriteAllText("installer.iss", $installerScript, [System.Text.UTF8Encoding]::new($false))
+          "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Set up Python
         uses: actions/setup-python@v5

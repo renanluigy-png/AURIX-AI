@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import subprocess
 import sys
 import threading
 
-from PySide6.QtCore import QObject, QRunnable, QThread, QThreadPool, Signal, Slot, Qt
+from PySide6.QtCore import QObject, QRunnable, QThread, QThreadPool, QTimer, Signal, Slot, Qt
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
-from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
+from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QProgressDialog, QSystemTrayIcon
 
 from aurix.brain import AssistantBrain
 from aurix.commands import parse_command
@@ -25,6 +26,8 @@ from aurix.config import (
 from aurix.onboarding import SetupDialog
 from aurix.hud import HUDWindow
 from aurix.voice import VoiceService
+from aurix.build_info import APP_VERSION
+from aurix.updater import UpdateCheckWorker, UpdateDownloadWorker
 
 
 def _configure_logging() -> None:
@@ -157,6 +160,11 @@ class AurixController(QObject):
         self.thread_pool.setMaxThreadCount(2)
         self._request_in_flight = False
         self._active_worker = None
+        self._update_checker = None
+        self._update_downloader = None
+        self._update_progress = None
+        self._manual_update_check = False
+        self._update_prompt_visible = False
 
         self.window = HUDWindow()
         self.window.command_submitted.connect(self.handle_request)
@@ -185,6 +193,7 @@ class AurixController(QObject):
         self.voice.start()
         self.hotkey.start()
         logging.info("AURIX desktop process started")
+        QTimer.singleShot(3200, self._check_for_updates)
 
         if not QSystemTrayIcon.isSystemTrayAvailable():
             self.window.show_hud()
@@ -215,6 +224,10 @@ class AurixController(QObject):
         self.autostart_action.setChecked(is_start_with_windows_enabled())
         self.autostart_action.toggled.connect(self._toggle_autostart)
         menu.addAction(self.autostart_action)
+
+        updates_action = QAction("Verificar atualizações", menu)
+        updates_action.triggered.connect(lambda: self._check_for_updates(manual=True))
+        menu.addAction(updates_action)
 
         menu.addSeparator()
         exit_action = QAction("Sair do AURIX", menu)
@@ -396,11 +409,154 @@ class AurixController(QObject):
             self.window.show_hud()
 
     @Slot()
+    def _check_for_updates(self, manual: bool = False) -> None:
+        if getattr(self, "_shutdown_started", False):
+            return
+        self._manual_update_check = self._manual_update_check or manual
+        if self._update_checker is not None and self._update_checker.isRunning():
+            return
+
+        checker = UpdateCheckWorker(self)
+        self._update_checker = checker
+        checker.update_available.connect(self._on_update_available)
+        checker.up_to_date.connect(self._on_up_to_date)
+        checker.check_failed.connect(self._on_update_check_failed)
+        checker.start()
+        if manual:
+            self.window.set_status("Verificando atualizações…")
+
+    @Slot(str)
+    def _on_up_to_date(self, version: str) -> None:
+        if self._manual_update_check:
+            self.window.set_status("AURIX atualizado.")
+            QMessageBox.information(
+                self.window,
+                "AURIX AI — atualizado",
+                f"Você já está usando a versão mais recente detectada ({version}).",
+            )
+        self._manual_update_check = False
+
+    @Slot(str)
+    def _on_update_check_failed(self, message: str) -> None:
+        logging.info("A atualização não pôde ser consultada: %s", message)
+        if self._manual_update_check:
+            QMessageBox.information(
+                self.window,
+                "Não foi possível verificar",
+                "Não consegui consultar as atualizações agora. Confira a conexão com a internet "
+                "e tente novamente mais tarde.\n\nDetalhe: " + message,
+            )
+        self._manual_update_check = False
+
+    @Slot(str, str, str, str, str)
+    def _on_update_available(self, version: str, release_name: str, notes: str, url: str, digest: str) -> None:
+        if getattr(self, "_shutdown_started", False) or self._update_prompt_visible:
+            return
+        self._update_prompt_visible = True
+        box = QMessageBox(self.window)
+        box.setWindowTitle("Atualização do AURIX AI")
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setText(f"Uma nova versão do AURIX está disponível: {version}")
+        box.setInformativeText(
+            f"Versão instalada: {APP_VERSION}\nNova versão: {version}\n\n"
+            "Posso baixar o instalador oficial e abri-lo para você atualizar."
+        )
+        if notes:
+            box.setDetailedText(notes[:3500])
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        box.setDefaultButton(QMessageBox.StandardButton.Yes)
+        box.button(QMessageBox.StandardButton.Yes).setText("Baixar e instalar")
+        box.button(QMessageBox.StandardButton.No).setText("Agora não")
+        answer = box.exec()
+        self._update_prompt_visible = False
+        self._manual_update_check = False
+        if answer == QMessageBox.StandardButton.Yes:
+            self._start_update_download(url, digest, version)
+
+    def _start_update_download(self, url: str, digest: str, version: str) -> None:
+        if self._update_downloader is not None and self._update_downloader.isRunning():
+            return
+        progress = QProgressDialog(
+            f"Baixando atualização {version}…",
+            "Cancelar",
+            0,
+            100,
+            self.window,
+        )
+        progress.setWindowTitle("Atualização do AURIX AI")
+        progress.setWindowModality(Qt.WindowModality.ApplicationModal)
+        progress.setMinimumDuration(0)
+        progress.setAutoClose(False)
+        progress.setValue(0)
+        self._update_progress = progress
+
+        worker = UpdateDownloadWorker(url, digest, self)
+        self._update_downloader = worker
+        worker.progress_changed.connect(self._on_update_download_progress)
+        worker.download_ready.connect(self._on_update_download_ready)
+        worker.download_failed.connect(self._on_update_download_failed)
+        worker.download_cancelled.connect(self._on_update_download_cancelled)
+        progress.canceled.connect(worker.requestInterruption)
+        worker.start()
+
+    @Slot(int)
+    def _on_update_download_progress(self, value: int) -> None:
+        if self._update_progress is not None:
+            self._update_progress.setValue(max(0, min(100, value)))
+
+    def _close_update_progress(self) -> None:
+        if self._update_progress is not None:
+            self._update_progress.close()
+            self._update_progress.deleteLater()
+            self._update_progress = None
+
+    @Slot(str)
+    def _on_update_download_ready(self, installer_path: str) -> None:
+        self._close_update_progress()
+        try:
+            subprocess.Popen([installer_path], close_fds=True)
+        except OSError as exc:
+            QMessageBox.warning(
+                self.window,
+                "Não foi possível iniciar o instalador",
+                f"O download terminou, mas não consegui abrir o instalador.\n\n{exc}",
+            )
+            return
+        QMessageBox.information(
+            self.window,
+            "Atualização pronta",
+            "O instalador foi aberto. Siga as etapas na tela; o AURIX será fechado para permitir a atualização.",
+        )
+        self.shutdown()
+
+    @Slot(str)
+    def _on_update_download_failed(self, message: str) -> None:
+        self._close_update_progress()
+        QMessageBox.warning(
+            self.window,
+            "Falha no download",
+            "Não consegui baixar ou verificar o instalador. Nenhum arquivo foi executado.\n\n" + message,
+        )
+
+    @Slot()
+    def _on_update_download_cancelled(self) -> None:
+        self._close_update_progress()
+        self.window.set_status("Download da atualização cancelado.")
+
+    @Slot()
     def shutdown(self) -> None:
         if getattr(self, "_shutdown_started", False):
             return
         self._shutdown_started = True
         logging.info("Shutting down AURIX")
+        checker = self._update_checker
+        if checker is not None and checker.isRunning():
+            checker.requestInterruption()
+            checker.wait(6500)
+        downloader = self._update_downloader
+        if downloader is not None and downloader.isRunning():
+            downloader.requestInterruption()
+            downloader.wait(16000)
         self.voice.stop()
         self.hotkey.stop()
         self.voice.wait(2500)
