@@ -45,8 +45,9 @@ class SetupDialog(QDialog):
         root.addWidget(title)
 
         intro = QLabel(
-            "O aplicativo já inclui seu próprio runtime e bibliotecas. Escolha a inteligência, "
-            "configure a voz e decida quando o AURIX poderá usar o microfone."
+            "Escolha o provedor de IA e configure a voz. Para IA local, o Qwen 2.5 7B oferece "
+            "respostas e uso de ferramentas geralmente melhores que o modelo pequeno anterior, "
+            "mas baixa vários GB na primeira conversa. O microfone só será usado conforme sua escolha."
         )
         intro.setWordWrap(True)
         intro.setStyleSheet("color: #b8cedb;")
@@ -74,8 +75,8 @@ class SetupDialog(QDialog):
         )
         form.addRow("", self.key_help)
 
-        self.ollama_model = QLineEdit(settings.ollama_model or "llama3.2")
-        self.ollama_model.setPlaceholderText("Ex.: llama3.2")
+        self.ollama_model = QLineEdit(settings.ollama_model or "qwen2.5:7b")
+        self.ollama_model.setPlaceholderText("Ex.: qwen2.5:7b")
         form.addRow("Modelo local", self.ollama_model)
 
         self.ollama_install = QPushButton("Instalar Ollama neste computador")

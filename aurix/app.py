@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import sys
 import threading
 
 from PySide6.QtCore import QObject, QRunnable, QThread, QThreadPool, Signal, Slot, Qt
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
 from aurix.brain import AssistantBrain
@@ -33,6 +35,39 @@ def _configure_logging() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         encoding="utf-8",
     )
+
+
+def _instance_server_name() -> str:
+    identity = str(APP_DATA_DIR.resolve()).casefold().encode("utf-8")
+    return "aurix-ai-" + hashlib.sha256(identity).hexdigest()[:16]
+
+
+def _notify_existing_instance(name: str) -> bool:
+    socket = QLocalSocket()
+    socket.connectToServer(name)
+    if not socket.waitForConnected(300):
+        socket.abort()
+        return False
+    socket.write(b"show\n")
+    socket.flush()
+    socket.waitForBytesWritten(300)
+    socket.disconnectFromServer()
+    return True
+
+
+def _create_instance_server(app: QApplication) -> tuple[QLocalServer | None, str]:
+    name = _instance_server_name()
+    if _notify_existing_instance(name):
+        return None, name
+    server = QLocalServer(app)
+    if server.listen(name):
+        return server, name
+    if _notify_existing_instance(name):
+        return None, name
+    QLocalServer.removeServer(name)
+    if not server.listen(name):
+        logging.error("Could not create single-instance IPC endpoint: %s", server.errorString())
+    return server, name
 
 
 def _make_icon() -> QIcon:
@@ -127,6 +162,7 @@ class AurixController(QObject):
         self.window.command_submitted.connect(self.handle_request)
         self.window.settings_requested.connect(self._open_setup_dialog)
         self.window.voice_toggle_requested.connect(self._toggle_voice_from_hud)
+        self.window.listen_once_requested.connect(self._listen_once_from_hud)
         self.window.set_voice_enabled(self.settings.wake_word_enabled)
 
         self.voice = VoiceService(threshold=self.settings.wake_threshold)
@@ -203,6 +239,21 @@ class AurixController(QObject):
         logging.warning(message)
         self.window.set_status(message)
         self.tray.setToolTip("AURIX AI — verifique o status da voz")
+        lowered = message.casefold()
+        if "hey jarvis não foi inicializado" in lowered or "não consegui acessar o microfone" in lowered:
+            self.settings.wake_word_enabled = False
+            self.settings.save()
+            if hasattr(self, "voice_action"):
+                self.voice_action.blockSignals(True)
+                self.voice_action.setChecked(False)
+                self.voice_action.blockSignals(False)
+            self.window.set_voice_enabled(False)
+            self.tray.showMessage(
+                "AURIX AI · voz",
+                "A ativação contínua foi pausada. Você ainda pode tentar o botão FALAR.",
+                QSystemTrayIcon.MessageIcon.Warning,
+                4500,
+            )
 
     @Slot(str, bool)
     def handle_request(self, text: str, speak_result: bool = False) -> None:
@@ -260,6 +311,20 @@ class AurixController(QObject):
             logging.exception("Text-to-speech failed")
 
     @Slot()
+    def _listen_once_from_hud(self) -> None:
+        """Start direct push-to-talk capture; no wake word is needed."""
+        if getattr(self, "_shutdown_started", False):
+            return
+        try:
+            if not self.voice.isRunning():
+                self.voice.start()
+            self.voice.request_listen_once()
+            self.window.set_status("Ouvindo você · fale seu pedido agora")
+        except RuntimeError:
+            logging.exception("Could not start direct voice capture")
+            self.window.set_status("Não consegui iniciar o microfone. Tente novamente.")
+
+    @Slot()
     def _toggle_voice_from_hud(self) -> None:
         self.voice_action.setChecked(not self.voice_action.isChecked())
 
@@ -268,6 +333,11 @@ class AurixController(QObject):
         self.settings.wake_word_enabled = enabled
         self.settings.save()
         self.voice.set_enabled(enabled)
+        if enabled and not self.voice.isRunning():
+            try:
+                self.voice.start()
+            except RuntimeError:
+                logging.exception("Could not restart the voice worker")
         self.window.set_voice_enabled(enabled)
         self.window.set_status(
             "Escuta de ativação ativa." if enabled else "Escuta pausada. O microfone será fechado."
@@ -297,6 +367,11 @@ class AurixController(QObject):
         self.brain = AssistantBrain()
         self.voice.threshold = self.settings.wake_threshold
         self.voice.set_enabled(self.settings.wake_word_enabled)
+        if self.settings.wake_word_enabled and not self.voice.isRunning():
+            try:
+                self.voice.start()
+            except RuntimeError:
+                logging.exception("Could not restart the voice worker after setup")
         self.window.set_voice_enabled(self.settings.wake_word_enabled)
         if self.settings.start_with_windows:
             ok, message = set_start_with_windows(True)
@@ -340,8 +415,40 @@ def main() -> None:
     app.setApplicationName("AURIX AI")
     app.setOrganizationName("AURIX")
     app.setQuitOnLastWindowClosed(False)
+
+    instance_server, instance_name = _create_instance_server(app)
+    if instance_server is None:
+        return
+
+    instance_state: dict[str, object] = {"controller": None, "pending_show": False}
+
+    def handle_connection() -> None:
+        while instance_server.hasPendingConnections():
+            client = instance_server.nextPendingConnection()
+
+            def show_existing(socket=client) -> None:
+                try:
+                    socket.readAll()
+                    controller = instance_state.get("controller")
+                    if controller is not None:
+                        controller.window.show_hud()
+                    else:
+                        instance_state["pending_show"] = True
+                except Exception:
+                    logging.exception("Failed to handle activation request")
+                finally:
+                    socket.disconnectFromServer()
+
+            client.readyRead.connect(show_existing)
+            client.disconnected.connect(client.deleteLater)
+            if client.bytesAvailable():
+                show_existing()
+
+    instance_server.newConnection.connect(handle_connection)
+
     first_launch = not Settings.load().first_run_complete
     initial_settings = Settings.load()
+    background_start = "--background" in sys.argv[1:]
     if first_launch:
         SetupDialog(initial_settings).exec()
         initial_settings = Settings.load()
@@ -351,18 +458,25 @@ def main() -> None:
         if not ok:
             logging.warning(message)
     controller = AurixController(app)
-    if first_launch:
+    instance_state["controller"] = controller
+
+    if first_launch or not background_start:
         controller.window.show_hud()
+    if instance_state["pending_show"]:
+        controller.window.show_hud()
+
+    if first_launch:
         if initial_settings.first_run_complete:
             controller.window.set_response(
-                "AURIX iniciado. Diga “Hey Jarvis” ou digite um pedido. "
-                "Use Ctrl+Alt+Espaço para chamar esta interface novamente."
+                "AURIX iniciado. Clique em FALAR para ditar um pedido, diga “Hey Jarvis” "
+                "se a ativação contínua estiver ligada, ou escreva no campo de conversa."
             )
         else:
             controller.window.set_response(
                 "AURIX iniciado sem concluir a configuração. Abra o menu da bandeja e selecione "
                 "Configurar IA e voz para começar."
             )
+
     app.aboutToQuit.connect(controller.shutdown)
     sys.exit(app.exec())
 

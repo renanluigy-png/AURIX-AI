@@ -171,6 +171,7 @@ class HUDWindow(QMainWindow):
     command_submitted = Signal(str, bool)
     settings_requested = Signal()
     voice_toggle_requested = Signal()
+    listen_once_requested = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -181,8 +182,8 @@ class HUDWindow(QMainWindow):
             | Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setMinimumSize(720, 600)
-        self.resize(820, 680)
+        self.setMinimumSize(760, 620)
+        self.resize(900, 760)
         self._drag_position: QPoint | None = None
         self._voice_enabled = False
         self._message_count = 0
@@ -232,42 +233,95 @@ class HUDWindow(QMainWindow):
         divider.setFixedHeight(1)
         root.addWidget(divider)
 
-        # Hero: orb + generous negative space and a concise system message.
-        hero = QHBoxLayout()
-        hero.setSpacing(22)
+        # Main hero panel: holographic core + live telemetry.
+        hero_panel = QFrame()
+        hero_panel.setObjectName("heroPanel")
+        hero = QHBoxLayout(hero_panel)
+        hero.setContentsMargins(17, 16, 17, 16)
+        hero.setSpacing(20)
         self.core = CoreWidget()
+        self.core.setMinimumSize(206, 206)
+        self.core.setMaximumSize(220, 220)
         hero.addWidget(self.core, 0, Qt.AlignmentFlag.AlignVCenter)
 
         hero_copy = QVBoxLayout()
-        hero_copy.setSpacing(8)
-        eyebrow = QLabel("DESKTOP INTELLIGENCE  /  01")
+        hero_copy.setSpacing(9)
+        eyebrow = QLabel("A U R I X   /   NEURAL INTERFACE")
         eyebrow.setObjectName("eyebrow")
         hero_copy.addWidget(eyebrow)
 
-        self.hero_title = QLabel("Pronto para pensar com você.")
+        self.hero_title = QLabel("Inteligência ao seu comando.")
         self.hero_title.setObjectName("heroTitle")
         self.hero_title.setWordWrap(True)
         hero_copy.addWidget(self.hero_title)
 
         self.hero_description = QLabel(
-            "Converse normalmente. Quando uma tarefa exigir ação, eu escolho uma ferramenta "
-            "disponível e retorno com o resultado."
+            "Uma assistente para conversar, entender o que você quer e executar ações "
+            "permitidas no computador. Fale pelo microfone ou escreva seu pedido."
         )
         self.hero_description.setObjectName("heroDescription")
         self.hero_description.setWordWrap(True)
         hero_copy.addWidget(self.hero_description)
 
         meta = QHBoxLayout()
-        meta.setSpacing(7)
-        for label in ("NATURAL LANGUAGE", "LOCAL TOOLS", "PERMISSION FIRST"):
+        meta.setSpacing(6)
+        for label in ("AI AGENT", "VOICE INPUT", "DESKTOP ACTIONS"):
             chip = QLabel(label)
             chip.setObjectName("metaChip")
             meta.addWidget(chip)
         meta.addStretch(1)
         hero_copy.addLayout(meta)
+
+        telemetry = QHBoxLayout()
+        telemetry.setSpacing(8)
+        self.engine_value = QLabel("ONLINE")
+        self.voice_value = QLabel("READY")
+        self.action_value = QLabel("ARMED")
+        for title_text, value_widget in (
+            ("NEURAL CORE", self.engine_value),
+            ("VOICE CHANNEL", self.voice_value),
+            ("ACTION LAYER", self.action_value),
+        ):
+            card = QFrame()
+            card.setObjectName("telemetryCard")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(9, 7, 9, 7)
+            card_layout.setSpacing(4)
+            title_label = QLabel(title_text)
+            title_label.setObjectName("telemetryLabel")
+            value_widget.setObjectName("telemetryValue")
+            card_layout.addWidget(title_label)
+            card_layout.addWidget(value_widget)
+            telemetry.addWidget(card, 1)
+        hero_copy.addLayout(telemetry)
         hero_copy.addStretch(1)
         hero.addLayout(hero_copy, 1)
-        root.addLayout(hero)
+        root.addWidget(hero_panel)
+
+        quick_header = QHBoxLayout()
+        quick_title = QLabel("ACESSO RÁPIDO")
+        quick_title.setObjectName("sectionTitle")
+        quick_header.addWidget(quick_title)
+        quick_header.addStretch(1)
+        quick_hint = QLabel("AÇÕES DISPONÍVEIS")
+        quick_hint.setObjectName("sectionMeta")
+        quick_header.addWidget(quick_hint)
+        root.addLayout(quick_header)
+
+        quick_actions = QHBoxLayout()
+        quick_actions.setSpacing(8)
+        for caption, command in (
+            ("◉  SPOTIFY", "Abra o Spotify"),
+            ("◉  WHATSAPP", "Abra o WhatsApp"),
+            ("⌕  PESQUISAR NA WEB", "Pesquise na web por assuntos atuais"),
+        ):
+            action_button = QPushButton(caption)
+            action_button.setObjectName("quickButton")
+            action_button.clicked.connect(
+                lambda checked=False, request=command: self.command_submitted.emit(request, False)
+            )
+            quick_actions.addWidget(action_button)
+        root.addLayout(quick_actions)
 
         session_header = QHBoxLayout()
         session_title = QLabel("CONVERSA")
@@ -289,19 +343,25 @@ class HUDWindow(QMainWindow):
         root.addWidget(self.chat, 1)
 
         composer = QHBoxLayout()
-        composer.setSpacing(9)
+        composer.setSpacing(8)
         self.input_field = QLineEdit()
         self.input_field.setObjectName("commandInput")
-        self.input_field.setPlaceholderText("Peça qualquer coisa…")
+        self.input_field.setPlaceholderText("Converse com AURIX — escreva um pedido…")
         self.input_field.setClearButtonEnabled(True)
         self.input_field.returnPressed.connect(self._submit_typed)
         composer.addWidget(self.input_field, 1)
 
-        self.voice_button = QPushButton("VOZ OFF")
-        self.voice_button.setObjectName("voiceButton")
-        self.voice_button.setToolTip("Ativar ou pausar a palavra de ativação")
-        self.voice_button.clicked.connect(self.voice_toggle_requested.emit)
+        self.voice_button = QPushButton("◉  FALAR")
+        self.voice_button.setObjectName("listenButton")
+        self.voice_button.setToolTip("Gravar um pedido agora, sem precisar dizer Hey Jarvis")
+        self.voice_button.clicked.connect(self.listen_once_requested.emit)
         composer.addWidget(self.voice_button)
+
+        self.wake_button = QPushButton("HEY JARVIS · OFF")
+        self.wake_button.setObjectName("voiceButton")
+        self.wake_button.setToolTip("Ativar ou pausar a palavra de ativação em segundo plano")
+        self.wake_button.clicked.connect(self.voice_toggle_requested.emit)
+        composer.addWidget(self.wake_button)
 
         self.send_button = QPushButton("ENVIAR  ↗")
         self.send_button.setObjectName("sendButton")
@@ -365,6 +425,22 @@ class HUDWindow(QMainWindow):
                 border-color: rgba(96, 224, 246, 145);
             }
             QFrame#divider { background: rgba(70, 168, 200, 76); border: 0; }
+            QFrame#heroPanel {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(11, 39, 60, 210), stop:0.5 rgba(6, 25, 42, 225),
+                    stop:1 rgba(5, 16, 29, 230));
+                border: 1px solid rgba(62, 174, 207, 105); border-radius: 16px;
+            }
+            QFrame#telemetryCard {
+                background: rgba(2, 13, 24, 135);
+                border: 1px solid rgba(43, 115, 143, 72); border-radius: 8px;
+            }
+            QLabel#telemetryLabel {
+                color: #527e93; font-size: 7px; font-weight: 700; letter-spacing: 0.8px;
+            }
+            QLabel#telemetryValue {
+                color: #91efff; font-size: 10px; font-weight: 700; letter-spacing: 0.7px;
+            }
             QLabel#eyebrow {
                 color: #66bed3; font-size: 9px; font-weight: 700; letter-spacing: 2px;
             }
@@ -393,10 +469,28 @@ class HUDWindow(QMainWindow):
                 padding: 11px 13px; selection-background-color: #087fa5;
             }
             QLineEdit#commandInput:focus { border: 1px solid #5bdcf7; }
+            QPushButton#quickButton {
+                color: #8bc8d9; background: rgba(10, 39, 56, 190);
+                border: 1px solid rgba(55, 132, 157, 85); border-radius: 8px;
+                padding: 9px 11px; font-size: 8px; font-weight: 700; letter-spacing: 0.7px;
+            }
+            QPushButton#quickButton:hover {
+                color: #dffbff; background: rgba(23, 105, 133, 110);
+                border-color: rgba(95, 218, 243, 155);
+            }
+            QPushButton#listenButton {
+                color: #071723; background: #80eaff; border: 1px solid #b7f8ff;
+                border-radius: 9px; padding: 10px 13px; font-size: 9px;
+                font-weight: 800; letter-spacing: 0.6px;
+            }
+            QPushButton#listenButton:hover { background: #b0f4ff; }
+            QPushButton#listenButton:disabled {
+                color: #547b8c; background: #102736; border-color: #24485a;
+            }
             QPushButton#voiceButton {
                 color: #9bdbea; background: rgba(24, 79, 99, 55);
                 border: 1px solid rgba(74, 157, 181, 110); border-radius: 9px;
-                padding: 10px 11px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+                padding: 10px 11px; font-size: 8px; font-weight: 700; letter-spacing: 0.4px;
             }
             QPushButton#voiceButton[enabled="true"] {
                 color: #a6fff1; background: rgba(23, 132, 109, 60);
@@ -467,13 +561,23 @@ class HUDWindow(QMainWindow):
         self.status_pill.style().polish(self.status_pill)
         self.core.set_mode(mode)
         if state == "listening":
-            self.hero_title.setText("Estou ouvindo.")
+            self.hero_title.setText("Estou ouvindo você.")
+            self.engine_value.setText("LISTENING")
+            self.voice_value.setText("CAPTURING")
         elif state == "thinking":
             self.hero_title.setText("Pensando com você.")
+            self.engine_value.setText("PROCESSING")
         elif state == "warning":
             self.hero_title.setText("Preciso da sua atenção.")
+            self.engine_value.setText("CHECK STATUS")
+            if any(term in lower for term in ("microfone", "voz", "hey jarvis", "transcri")):
+                self.voice_value.setText("CHECK MIC")
         else:
-            self.hero_title.setText("Pronto para pensar com você.")
+            self.hero_title.setText("Inteligência ao seu comando.")
+            self.engine_value.setText("ONLINE")
+            if not self._voice_enabled:
+                self.voice_value.setText("READY")
+            self.action_value.setText("ARMED")
 
     def set_response(self, text: str) -> None:
         # Assistant responses are appended to the session timeline.
@@ -509,14 +613,15 @@ class HUDWindow(QMainWindow):
 
     def set_voice_enabled(self, enabled: bool) -> None:
         self._voice_enabled = enabled
-        self.voice_button.setText("VOZ ON" if enabled else "VOZ OFF")
-        self.voice_button.setProperty("enabled", "true" if enabled else "false")
-        self.voice_button.style().unpolish(self.voice_button)
-        self.voice_button.style().polish(self.voice_button)
-        self.voice_button.setToolTip(
-            "Pausar a escuta da palavra de ativação" if enabled
-            else "Ativar a escuta da palavra de ativação"
+        self.wake_button.setText("HEY JARVIS · ON" if enabled else "HEY JARVIS · OFF")
+        self.wake_button.setProperty("enabled", "true" if enabled else "false")
+        self.wake_button.style().unpolish(self.wake_button)
+        self.wake_button.style().polish(self.wake_button)
+        self.wake_button.setToolTip(
+            "Pausar a palavra de ativação em segundo plano" if enabled
+            else "Ativar a palavra de ativação em segundo plano"
         )
+        self.voice_value.setText("WAKE ON" if enabled else "READY")
 
     def set_busy(self, busy: bool) -> None:
         self.send_button.setEnabled(not busy)

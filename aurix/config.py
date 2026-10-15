@@ -33,7 +33,8 @@ class Settings:
     wake_threshold: float = 0.55
     first_run_complete: bool = False
     llm_provider: str = "ollama"
-    ollama_model: str = "llama3.2"
+    ollama_model: str = "qwen2.5:7b"
+    model_migrated: bool = False
     speech_provider: str = "vosk"
     vosk_model_path: str = ""
 
@@ -48,6 +49,10 @@ class Settings:
             raw = {}
         allowed = set(cls.__dataclass_fields__)
         values = {key: value for key, value in raw.items() if key in allowed}
+
+        if values.get("ollama_model") == "llama3.2" and not values.get("model_migrated", False):
+            values["ollama_model"] = "qwen2.5:7b"
+            values["model_migrated"] = True
         try:
             settings = cls(**values)
             env_threshold = os.getenv("AURIX_WAKE_THRESHOLD")
@@ -72,14 +77,14 @@ class Settings:
 def _startup_command() -> str:
     """Run the source checkout directly; pythonw keeps a console window hidden."""
     if getattr(sys, "frozen", False):
-        return f'"{sys.executable}"'
+        return f'"{sys.executable}" --background'
     current = Path(sys.executable)
     windowless = current.with_name("pythonw.exe")
     executable = windowless if sys.platform == "win32" and windowless.exists() else current
     launcher = PROJECT_ROOT / "run_aurix.py"
     if launcher.is_file():
-        return f'"{executable}" "{launcher}"'
-    return f'"{executable}" -m aurix'
+        return f'"{executable}" "{launcher}" --background'
+    return f'"{executable}" -m aurix --background'
 
 
 def is_start_with_windows_enabled() -> bool:

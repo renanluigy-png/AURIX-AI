@@ -1,5 +1,5 @@
 #define MyAppName "AURIX AI"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.3.0"
 #define MyAppPublisher "Luigy Renan"
 #define MyAppExeName "AURIX-AI.exe"
 

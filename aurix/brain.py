@@ -126,6 +126,8 @@ class AssistantBrain:
                     "messages": messages,
                     "tools": ollama_tools(),
                     "stream": False,
+                    "keep_alive": "10m",
+                    "options": {"temperature": 0.35, "num_ctx": 8192},
                 },
                 ensure_ascii=False,
             ).encode("utf-8")
