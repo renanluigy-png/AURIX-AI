@@ -300,3 +300,9 @@ class AssistantBrain:
                         status_callback(f"Baixando modelo local… {percent}%")
                     else:
                         status_callback(f"Preparando modelo local… {status[:72]}")
+
+
+    def _remember(self, role: str, content: str) -> None:
+        self.history.append({"role": role, "content": content})
+        # Keep only a short in-memory context; never persist private chats by default.
+        self.history = self.history[-12:]
