@@ -91,6 +91,7 @@ def _make_icon() -> QIcon:
 
 class WorkerSignals(QObject):
     finished = Signal(str, bool)
+    status = Signal(str)
 
 
 class RequestWorker(QRunnable):
@@ -105,7 +106,7 @@ class RequestWorker(QRunnable):
     def run(self) -> None:
         try:
             # The selected model chooses whether to converse or call one of the tools.
-            result = self.brain.respond(self.text)
+            result = self.brain.respond(self.text, status_callback=self.signals.status.emit)
         except Exception:
             logging.exception("Unhandled error while processing a request")
             result = "Ocorreu um erro inesperado ao processar o pedido. Veja o log local do AURIX."
@@ -157,7 +158,7 @@ class AurixController(QObject):
         configure_runtime_settings(self.settings)
         self.brain = AssistantBrain()
         self.thread_pool = QThreadPool.globalInstance()
-        self.thread_pool.setMaxThreadCount(2)
+        self.thread_pool.setMaxThreadCount(1)
         self._request_in_flight = False
         self._active_worker = None
         self._update_checker = None
@@ -280,6 +281,7 @@ class AurixController(QObject):
         self.window.set_busy(True)
         self.window.set_status("Processando solicitação…")
         worker = RequestWorker(text, speak_result, self.brain)
+        worker.signals.status.connect(self.window.set_status)
         worker.signals.finished.connect(self._on_request_finished)
         self._active_worker = worker
         self.thread_pool.start(worker)

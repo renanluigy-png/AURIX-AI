@@ -1,7 +1,8 @@
-"""Explicit, validated tools the AURIX AI agent is allowed to use."""
+"""Explicit, validated tools that the AURIX AI agent is allowed to use."""
 
 from __future__ import annotations
 
+import ctypes
 import os
 import re
 import subprocess
@@ -16,8 +17,16 @@ from aurix.commands import APP_DISPLAY_NAMES, APP_TARGETS, ParsedCommand, execut
 APP_ENUM = sorted(APP_TARGETS)
 FOLDER_ENUM = ["desktop", "documents", "downloads"]
 
-# Responses API function definitions. Strict schemas make the model's arguments
-# predictable; execute_tool validates them again before doing anything.
+MEDIA_ACTIONS = {
+    "play_pause": (0xB3, "alternar reprodução/pausa"),
+    "next": (0xB0, "avançar para a próxima faixa"),
+    "previous": (0xB1, "voltar para a faixa anterior"),
+    "volume_up": (0xAF, "aumentar o volume"),
+    "volume_down": (0xAE, "diminuir o volume"),
+    "mute": (0xAD, "alternar o mudo"),
+}
+
+# Strict schemas constrain model-generated arguments; execute_tool validates again.
 TOOL_DEFINITIONS = [
     {
         "name": "open_application",
@@ -36,8 +45,24 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "control_media",
+        "description": "Send a standard Windows media key to control play/pause, next or previous track, volume up/down, and mute. Use only when the user asks for a media or volume action.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": sorted(MEDIA_ACTIONS),
+                    "description": "The requested media action.",
+                }
+            },
+            "required": ["action"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "search_web",
-        "description": "Open a browser search for information the user asked to look up online.",
+        "description": "Open a browser search for a concise query. This opens search results; it does not itself read or verify the pages.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -102,7 +127,7 @@ TOOL_DEFINITIONS = [
 
 
 def openai_tools() -> list[dict]:
-    """Format our function tools for the OpenAI Responses API."""
+    """Format the registered functions for the OpenAI Responses API."""
     return [
         {
             "type": "function",
@@ -116,7 +141,7 @@ def openai_tools() -> list[dict]:
 
 
 def ollama_tools() -> list[dict]:
-    """Format the same tools for Ollama's /api/chat endpoint."""
+    """Format the same tool list for Ollama's chat endpoint."""
     return [
         {
             "type": "function",
@@ -139,8 +164,24 @@ def _standard_folders() -> dict[str, Path]:
     }
 
 
+def _send_media_key(action: str) -> str:
+    if action not in MEDIA_ACTIONS:
+        return "Ação de mídia recusada: escolha uma ação permitida."
+    if sys.platform != "win32":
+        return "O controle de teclas multimídia está disponível nesta versão para Windows."
+
+    virtual_key, description = MEDIA_ACTIONS[action]
+    try:
+        user32 = ctypes.windll.user32
+        user32.keybd_event(virtual_key, 0, 0, 0)
+        user32.keybd_event(virtual_key, 0, 0x0002, 0)
+    except (AttributeError, OSError) as exc:
+        return f"Não consegui enviar o comando de mídia: {exc}"
+    return f"Enviei o comando para {description} ao controle de mídia do Windows."
+
+
 def execute_tool(name: str, arguments: dict) -> str:
-    """Run exactly one registered tool after checking its name and arguments."""
+    """Run a registered tool only after validating its name and arguments."""
     if not isinstance(arguments, dict):
         return "Ação recusada: os argumentos precisam ser um objeto."
 
@@ -162,23 +203,35 @@ def execute_tool(name: str, arguments: dict) -> str:
             return "Esse aplicativo não está na lista de ações permitidas."
         return execute_command(ParsedCommand("open_app", app_id))
 
+    if name == "control_media":
+        return _send_media_key(str(arguments["action"]))
+
     if name == "search_web":
         query = str(arguments["query"]).strip()
         if not query:
             return "A pesquisa não foi aberta porque a consulta está vazia."
         if len(query) > 300:
             return "A pesquisa não foi aberta: limite de 300 caracteres."
-        webbrowser.open("https://www.google.com/search?q=" + quote_plus(query))
-        return f"Abri uma pesquisa no navegador por: {query}"
+        opened = webbrowser.open("https://www.google.com/search?q=" + quote_plus(query), new=2)
+        if not opened:
+            return "Não consegui solicitar a abertura da pesquisa ao navegador padrão."
+        return f"Solicitei ao navegador a abertura de uma pesquisa por: {query}"
 
     if name == "open_website":
         raw_url = str(arguments["url"]).strip()
         parsed = urlparse(raw_url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.username
+            or parsed.password
+        ):
             return "URL recusada. Só posso abrir um endereço público HTTP ou HTTPS válido."
         if len(raw_url) > 2048:
             return "URL recusada: endereço muito longo."
-        webbrowser.open(raw_url)
+        opened = webbrowser.open(raw_url, new=2)
+        if not opened:
+            return "Não consegui solicitar a abertura do site ao navegador padrão."
         return f"Solicitei ao navegador a abertura de {parsed.netloc}."
 
     if name == "get_current_datetime":
@@ -202,7 +255,7 @@ def execute_tool(name: str, arguments: dict) -> str:
                 subprocess.Popen(["xdg-open", str(folder)], shell=False)
         except (OSError, subprocess.SubprocessError) as exc:
             return f"Não consegui abrir a pasta: {exc}"
-        return f"Abri a pasta {folder}."
+        return f"Solicitei a abertura da pasta {folder}."
 
     if name == "create_note":
         title = str(arguments["title"]).strip()

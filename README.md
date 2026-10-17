@@ -21,12 +21,13 @@ O AURIX não é apenas um conjunto de respostas predefinidas. Quando um provedor
 Ferramentas incluídas no MVP:
 
 - abrir aplicativos permitidos, como Spotify, WhatsApp, Discord, navegador, VS Code, Calculadora e Explorador;
+- controlar reprodução/pausa, faixa seguinte/anterior e volume pelas teclas multimídia do Windows;
 - pesquisar na web ou abrir um site HTTP/HTTPS solicitado;
 - consultar data e hora locais;
 - abrir Desktop, Documentos ou Downloads;
 - criar novas notas de texto em Documentos/AURIX Notes.
 
-As ferramentas validam os argumentos e não dão à IA um terminal arbitrário. Enviar mensagens, apagar arquivos, controlar qualquer janela ou executar comandos de shell não estão habilitados neste MVP.
+Pedidos diretos e inequívocos, como abrir o Spotify, são executados por um caminho local rápido para evitar uma chamada desnecessária ao modelo. As ferramentas validam os argumentos e não dão à IA um terminal arbitrário. Enviar mensagens, apagar arquivos, controlar qualquer janela ou executar comandos de shell não estão habilitados neste MVP. A pesquisa web abre resultados no navegador; ela não significa que o AURIX tenha lido essas páginas.
 
 ## Primeira configuração
 
@@ -40,7 +41,7 @@ Cole sua chave da API no assistente de configuração. A chave é salva no armaz
 
 ### Ollama — local
 
-Instale o [Ollama para Windows](https://ollama.com/download/windows) e mantenha-o em execução. O AURIX verifica o modelo configurado e, se ele ainda não existir no Ollama, solicita o download automaticamente na primeira conversa. O download pode ter vários GB e leva tempo; a velocidade depende da internet, memória e hardware do PC. O aplicativo não instala o runtime do Ollama sem seu consentimento.
+Instale o [Ollama para Windows](https://ollama.com/download/windows) e mantenha-o em execução. O modelo local recomendado é `qwen2.5:3b`, um perfil mais leve para respostas e chamadas de ferramentas. O AURIX verifica o modelo configurado e, se ele ainda não existir no Ollama, baixa-o na primeira conversa e mostra o progresso. O primeiro carregamento pode levar alguns minutos; a velocidade depende da internet, memória e hardware do PC. Você ainda pode escolher outro modelo nas configurações. O aplicativo não instala o runtime do Ollama sem seu consentimento.
 
 ### Voz e privacidade
 
