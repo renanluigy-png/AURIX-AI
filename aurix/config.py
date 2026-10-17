@@ -33,8 +33,9 @@ class Settings:
     wake_threshold: float = 0.55
     first_run_complete: bool = False
     llm_provider: str = "ollama"
-    ollama_model: str = "qwen2.5:7b"
+    ollama_model: str = "qwen2.5:3b"
     model_migrated: bool = False
+    performance_migrated: bool = True
     speech_provider: str = "vosk"
     vosk_model_path: str = ""
 
@@ -50,9 +51,21 @@ class Settings:
         allowed = set(cls.__dataclass_fields__)
         values = {key: value for key, value in raw.items() if key in allowed}
 
+        migrated = False
+        # Earlier installers selected a heavier 7B model by default. Migrate it once;
+        # a user who explicitly saves another model afterwards keeps that preference.
         if values.get("ollama_model") == "llama3.2" and not values.get("model_migrated", False):
-            values["ollama_model"] = "qwen2.5:7b"
+            values["ollama_model"] = "qwen2.5:3b"
             values["model_migrated"] = True
+            values["performance_migrated"] = True
+            migrated = True
+        elif values.get("ollama_model") == "qwen2.5:7b" and not values.get("performance_migrated", False):
+            values["ollama_model"] = "qwen2.5:3b"
+            values["performance_migrated"] = True
+            migrated = True
+        else:
+            values.setdefault("performance_migrated", True)
+
         try:
             settings = cls(**values)
             env_threshold = os.getenv("AURIX_WAKE_THRESHOLD")
@@ -60,6 +73,8 @@ class Settings:
                 0.1,
                 min(0.95, float(env_threshold if env_threshold is not None else settings.wake_threshold)),
             )
+            if migrated:
+                settings.save()
             return settings
         except (TypeError, ValueError):
             return cls()
@@ -134,7 +149,7 @@ def set_start_with_windows(enabled: bool) -> tuple[bool, str]:
 def configure_runtime_settings(settings: Settings) -> None:
     """Load preferences and retrieve API credentials from the OS credential store."""
     os.environ["AURIX_LLM_PROVIDER"] = settings.llm_provider
-    os.environ["AURIX_OLLAMA_MODEL"] = settings.ollama_model or "llama3.2"
+    os.environ["AURIX_OLLAMA_MODEL"] = settings.ollama_model or "qwen2.5:3b"
     os.environ["AURIX_SPEECH_PROVIDER"] = settings.speech_provider or "vosk"
     if settings.vosk_model_path:
         os.environ["AURIX_VOSK_MODEL_PATH"] = settings.vosk_model_path

@@ -1,9 +1,4 @@
-"""Premium floating HUD for AURIX AI.
-
-Visual direction: restrained cinematic sci-fi, inspired by holographic control
-interfaces without copying protected movie assets. The HUD stays lightweight,
-frameless, readable, and usable as a conversation window.
-"""
+"""A premium, lightweight floating HUD for AURIX AI."""
 
 from __future__ import annotations
 
@@ -12,7 +7,7 @@ import math
 from datetime import datetime
 
 from PySide6.QtCore import Qt, QTimer, Signal, QRectF, QPoint
-from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QRadialGradient
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QRadialGradient
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -28,29 +23,27 @@ from PySide6.QtWidgets import (
 
 
 class CoreWidget(QWidget):
-    """Slow animated cyan core with orbit rings, ticks, and a quiet center glow."""
+    """A restrained animated holographic core, designed to stay inexpensive to paint."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._angle = 0.0
         self._mode = "idle"
-        self.setMinimumSize(172, 172)
-        self.setMaximumSize(190, 190)
+        self.setFixedSize(158, 158)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self._timer = QTimer(self)
-        self._timer.setInterval(42)
+        self._timer.setInterval(80)
         self._timer.timeout.connect(self._advance)
 
     def set_mode(self, mode: str) -> None:
-        if mode not in {"idle", "listening", "thinking", "speaking", "warning"}:
+        if mode not in {"idle", "listening", "thinking", "warning", "speaking"}:
             mode = "idle"
         if self._mode != mode:
             self._mode = mode
             self.update()
 
     def _advance(self) -> None:
-        step = 1.15 if self._mode == "idle" else 2.4
-        self._angle = (self._angle + step) % 360
+        self._angle = (self._angle + (1.0 if self._mode == "idle" else 2.0)) % 360
         self.update()
 
     def showEvent(self, event) -> None:
@@ -67,106 +60,99 @@ class CoreWidget(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         center = self.rect().center()
         cx, cy = float(center.x()), float(center.y())
-        radius = min(self.width(), self.height()) * 0.405
+        radius = min(self.width(), self.height()) * 0.40
 
-        # The glow intensifies while the assistant listens or thinks.
-        intensity = 88 if self._mode in {"listening", "thinking", "speaking"} else 48
         if self._mode == "warning":
-            accent = QColor(255, 177, 96)
+            accent = QColor(255, 178, 110)
+        elif self._mode == "thinking":
+            accent = QColor(164, 153, 255)
         else:
-            accent = QColor(82, 225, 255)
+            accent = QColor(92, 226, 255)
 
-        glow = QRadialGradient(cx, cy, radius * 1.5)
-        glow.setColorAt(0.0, QColor(accent.red(), accent.green(), accent.blue(), intensity))
-        glow.setColorAt(0.46, QColor(12, 127, 181, 34))
-        glow.setColorAt(1.0, QColor(3, 14, 28, 0))
+        glow = QRadialGradient(cx, cy, radius * 1.48)
+        glow.setColorAt(0.0, QColor(accent.red(), accent.green(), accent.blue(), 42))
+        glow.setColorAt(0.52, QColor(24, 117, 158, 23))
+        glow.setColorAt(1.0, QColor(4, 14, 27, 0))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(glow)
-        painter.drawEllipse(
-            QRectF(cx - radius * 1.5, cy - radius * 1.5, radius * 3, radius * 3)
-        )
+        painter.drawEllipse(QRectF(cx - radius * 1.48, cy - radius * 1.48, radius * 2.96, radius * 2.96))
 
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(QColor(68, 199, 232, 135), 1.0))
-        painter.drawEllipse(QRectF(cx - radius * 1.10, cy - radius * 1.10, radius * 2.20, radius * 2.20))
-        painter.setPen(QPen(QColor(86, 222, 249, 95), 1.0))
-        painter.drawEllipse(QRectF(cx - radius * 0.91, cy - radius * 0.91, radius * 1.82, radius * 1.82))
+        painter.setPen(QPen(QColor(86, 197, 224, 100), 1.0))
+        painter.drawEllipse(QRectF(cx - radius * 1.12, cy - radius * 1.12, radius * 2.24, radius * 2.24))
+        painter.setPen(QPen(QColor(83, 204, 232, 70), 1.0))
+        painter.drawEllipse(QRectF(cx - radius * 0.92, cy - radius * 0.92, radius * 1.84, radius * 1.84))
 
-        # Segmented outer orbit.
+        # One rotation and twelve ticks are enough for a precise, understated HUD look.
         painter.save()
         painter.translate(cx, cy)
         painter.rotate(self._angle)
-        for start, span, width, alpha in (
-            (12, 76, 2.2, 220),
-            (112, 34, 1.5, 130),
-            (174, 54, 2.0, 190),
-            (256, 46, 1.5, 150),
-        ):
+        for index in range(12):
+            major = index % 3 == 0
             painter.setPen(
                 QPen(
-                    QColor(accent.red(), accent.green(), accent.blue(), alpha),
-                    width,
+                    QColor(accent.red(), accent.green(), accent.blue(), 185 if major else 75),
+                    1.5 if major else 0.8,
                     Qt.PenStyle.SolidLine,
                     Qt.PenCapStyle.RoundCap,
                 )
             )
-            painter.drawArc(
-                QRectF(-radius, -radius, radius * 2, radius * 2),
-                start * 16,
-                span * 16,
-            )
+            painter.drawLine(0, -int(radius * 1.03), 0, -int(radius * (0.91 if major else 0.96)))
+            painter.rotate(30)
         painter.restore()
 
-        # Fine calibration ticks.
         painter.save()
         painter.translate(cx, cy)
-        painter.rotate(-self._angle * 0.35)
-        for angle in range(0, 360, 15):
-            painter.save()
-            painter.rotate(angle)
-            long_tick = angle % 45 == 0
-            painter.setPen(
-                QPen(
-                    QColor(125, 229, 249, 165 if long_tick else 78),
-                    1.2 if long_tick else 0.8,
-                )
+        painter.rotate(-self._angle * 0.7)
+        painter.setPen(
+            QPen(
+                QColor(accent.red(), accent.green(), accent.blue(), 190),
+                2.0,
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
             )
-            painter.drawLine(0, int(-radius * 0.99), 0, int(-radius * (0.92 if long_tick else 0.95)))
-            painter.restore()
+        )
+        painter.drawArc(
+            QRectF(-radius * 0.80, -radius * 0.80, radius * 1.60, radius * 1.60),
+            18 * 16,
+            112 * 16,
+        )
+        painter.drawArc(
+            QRectF(-radius * 0.80, -radius * 0.80, radius * 1.60, radius * 1.60),
+            205 * 16,
+            58 * 16,
+        )
         painter.restore()
 
-        # Central glass-like lens.
-        lens_radius = radius * 0.59
-        lens = QRadialGradient(cx - lens_radius * 0.22, cy - lens_radius * 0.28, lens_radius * 1.35)
-        lens.setColorAt(0.0, QColor(123, 248, 255, 238))
-        lens.setColorAt(0.18, QColor(37, 176, 220, 238))
-        lens.setColorAt(0.64, QColor(9, 56, 91, 247))
-        lens.setColorAt(1.0, QColor(3, 15, 30, 250))
-        painter.setPen(QPen(QColor(accent.red(), accent.green(), accent.blue(), 205), 1.2))
+        lens_radius = radius * 0.62
+        lens = QRadialGradient(cx - lens_radius * 0.28, cy - lens_radius * 0.32, lens_radius * 1.45)
+        lens.setColorAt(0.0, QColor(176, 250, 255, 238))
+        lens.setColorAt(0.20, QColor(59, 185, 221, 243))
+        lens.setColorAt(0.68, QColor(8, 54, 82, 248))
+        lens.setColorAt(1.0, QColor(4, 17, 31, 252))
+        painter.setPen(QPen(QColor(accent.red(), accent.green(), accent.blue(), 220), 1.1))
         painter.setBrush(lens)
         painter.drawEllipse(QRectF(cx - lens_radius, cy - lens_radius, lens_radius * 2, lens_radius * 2))
 
-        # A restrained waveform / crosshair in the core.
-        painter.setPen(QPen(QColor(202, 255, 255, 235), 1.1, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        wave_width = radius * 0.43
+        painter.setPen(QPen(QColor(219, 255, 255, 225), 1.25, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         if self._mode in {"listening", "speaking"}:
+            width = radius * 0.42
             points = []
-            for index in range(17):
-                x = cx - wave_width + (2 * wave_width * index / 16)
-                wave = math.sin(index * 0.82 + self._angle * 0.10)
-                envelope = 0.35 + 0.65 * abs(math.sin(index * 0.32 + 0.5))
-                y = cy + wave * radius * 0.19 * envelope
+            for index in range(13):
+                x = cx - width + (2 * width * index / 12)
+                envelope = 0.30 + 0.70 * abs(math.sin(index * 0.38 + 0.4))
+                y = cy + math.sin(index * 0.87 + self._angle * 0.11) * radius * 0.17 * envelope
                 points.append((int(x), int(y)))
             for first, second in zip(points, points[1:]):
                 painter.drawLine(first[0], first[1], second[0], second[1])
         else:
-            painter.drawLine(int(cx - radius * 0.17), int(cy), int(cx + radius * 0.17), int(cy))
-            painter.drawLine(int(cx), int(cy - radius * 0.17), int(cx), int(cy + radius * 0.17))
+            painter.drawLine(int(cx - radius * 0.18), int(cy), int(cx + radius * 0.18), int(cy))
+            painter.drawLine(int(cx), int(cy - radius * 0.18), int(cx), int(cy + radius * 0.18))
         painter.end()
 
 
 class HUDWindow(QMainWindow):
-    """Frameless premium chat/HUD window; closing it only hides the assistant."""
+    """Frameless assistant window. Closing it hides the HUD but keeps AURIX running."""
 
     command_submitted = Signal(str, bool)
     settings_requested = Signal()
@@ -182,24 +168,31 @@ class HUDWindow(QMainWindow):
             | Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setMinimumSize(760, 620)
-        self.resize(900, 760)
+        self.setMinimumSize(790, 660)
+        self.resize(900, 720)
         self._drag_position: QPoint | None = None
         self._voice_enabled = False
         self._message_count = 0
+        self.status_label_text = "Pronto para ajudar."
+        self._quick_buttons: list[QPushButton] = []
 
         shell = QFrame()
         shell.setObjectName("shell")
         root = QVBoxLayout(shell)
-        root.setContentsMargins(27, 23, 27, 20)
-        root.setSpacing(15)
+        root.setContentsMargins(23, 20, 23, 17)
+        root.setSpacing(12)
 
-        # Top brand bar.
         header = QHBoxLayout()
-        header.setSpacing(12)
+        header.setSpacing(11)
+        self.brand_mark = QLabel("A")
+        self.brand_mark.setObjectName("brandMark")
+        self.brand_mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.brand_mark.setFixedSize(38, 38)
+        header.addWidget(self.brand_mark)
+
         brand_stack = QVBoxLayout()
         brand_stack.setSpacing(1)
-        brand = QLabel("A U R I X")
+        brand = QLabel("AURIX")
         brand.setObjectName("brand")
         tagline = QLabel("PERSONAL INTELLIGENCE")
         tagline.setObjectName("tagline")
@@ -208,7 +201,7 @@ class HUDWindow(QMainWindow):
         header.addLayout(brand_stack)
         header.addStretch(1)
 
-        self.status_pill = QLabel("●  STANDBY")
+        self.status_pill = QLabel("●  ONLINE")
         self.status_pill.setObjectName("statusPill")
         self.status_pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.addWidget(self.status_pill)
@@ -222,7 +215,7 @@ class HUDWindow(QMainWindow):
 
         self.hide_button = QPushButton("—")
         self.hide_button.setObjectName("iconButton")
-        self.hide_button.setToolTip("Ocultar interface; AURIX continua em segundo plano")
+        self.hide_button.setToolTip("Ocultar a interface; AURIX continua em segundo plano")
         self.hide_button.setAccessibleName("Ocultar AURIX")
         self.hide_button.clicked.connect(self.hide)
         header.addWidget(self.hide_button)
@@ -233,105 +226,85 @@ class HUDWindow(QMainWindow):
         divider.setFixedHeight(1)
         root.addWidget(divider)
 
-        # Main hero panel: holographic core + live telemetry.
         hero_panel = QFrame()
         hero_panel.setObjectName("heroPanel")
         hero = QHBoxLayout(hero_panel)
-        hero.setContentsMargins(17, 16, 17, 16)
-        hero.setSpacing(20)
-        self.core = CoreWidget()
-        self.core.setMinimumSize(206, 206)
-        self.core.setMaximumSize(220, 220)
-        hero.addWidget(self.core, 0, Qt.AlignmentFlag.AlignVCenter)
+        hero.setContentsMargins(18, 14, 22, 14)
+        hero.setSpacing(19)
+        hero.addWidget(CoreWidget(), 0, Qt.AlignmentFlag.AlignVCenter)
+        self.core = hero.itemAt(0).widget()
 
         hero_copy = QVBoxLayout()
-        hero_copy.setSpacing(9)
-        eyebrow = QLabel("A U R I X   /   NEURAL INTERFACE")
+        hero_copy.setSpacing(7)
+        eyebrow = QLabel("SEU COPILOTO PARA DESKTOP")
         eyebrow.setObjectName("eyebrow")
         hero_copy.addWidget(eyebrow)
 
-        self.hero_title = QLabel("Inteligência ao seu comando.")
+        self.hero_title = QLabel("O que vamos fazer hoje?")
         self.hero_title.setObjectName("heroTitle")
         self.hero_title.setWordWrap(True)
         hero_copy.addWidget(self.hero_title)
 
         self.hero_description = QLabel(
-            "Uma assistente para conversar, entender o que você quer e executar ações "
-            "permitidas no computador. Fale pelo microfone ou escreva seu pedido."
+            "Converse normalmente. AURIX entende o pedido, decide quando usar ferramentas "
+            "e informa o resultado sem inventar ações."
         )
         self.hero_description.setObjectName("heroDescription")
         self.hero_description.setWordWrap(True)
         hero_copy.addWidget(self.hero_description)
 
-        meta = QHBoxLayout()
-        meta.setSpacing(6)
-        for label in ("AI AGENT", "VOICE INPUT", "DESKTOP ACTIONS"):
-            chip = QLabel(label)
-            chip.setObjectName("metaChip")
-            meta.addWidget(chip)
-        meta.addStretch(1)
-        hero_copy.addLayout(meta)
+        capability_row = QHBoxLayout()
+        capability_row.setSpacing(7)
+        for caption in ("IA GENERATIVA", "AÇÕES VALIDADAS", "VOZ OPCIONAL"):
+            chip = QLabel(caption)
+            chip.setObjectName("capabilityChip")
+            capability_row.addWidget(chip)
+        capability_row.addStretch(1)
+        hero_copy.addLayout(capability_row)
 
-        telemetry = QHBoxLayout()
-        telemetry.setSpacing(8)
-        self.engine_value = QLabel("ONLINE")
-        self.voice_value = QLabel("READY")
-        self.action_value = QLabel("ARMED")
-        for title_text, value_widget in (
-            ("NEURAL CORE", self.engine_value),
-            ("VOICE CHANNEL", self.voice_value),
-            ("ACTION LAYER", self.action_value),
-        ):
-            card = QFrame()
-            card.setObjectName("telemetryCard")
-            card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(9, 7, 9, 7)
-            card_layout.setSpacing(4)
-            title_label = QLabel(title_text)
-            title_label.setObjectName("telemetryLabel")
-            value_widget.setObjectName("telemetryValue")
-            card_layout.addWidget(title_label)
-            card_layout.addWidget(value_widget)
-            telemetry.addWidget(card, 1)
-        hero_copy.addLayout(telemetry)
-        hero_copy.addStretch(1)
+        self.engine_value = QLabel("MODELO PRONTO QUANDO CONFIGURADO")
+        self.engine_value.setObjectName("engineLabel")
+        hero_copy.addWidget(self.engine_value)
         hero.addLayout(hero_copy, 1)
         root.addWidget(hero_panel)
 
-        quick_header = QHBoxLayout()
-        quick_title = QLabel("ACESSO RÁPIDO")
-        quick_title.setObjectName("sectionTitle")
-        quick_header.addWidget(quick_title)
-        quick_header.addStretch(1)
-        quick_hint = QLabel("AÇÕES DISPONÍVEIS")
-        quick_hint.setObjectName("sectionMeta")
-        quick_header.addWidget(quick_hint)
-        root.addLayout(quick_header)
+        section_row = QHBoxLayout()
+        section_title = QLabel("ATALHOS")
+        section_title.setObjectName("sectionTitle")
+        section_row.addWidget(section_title)
+        section_row.addStretch(1)
+        section_hint = QLabel("UMA AÇÃO SIMPLES, SEM ESPERAR O MODELO")
+        section_hint.setObjectName("sectionHint")
+        section_row.addWidget(section_hint)
+        root.addLayout(section_row)
 
-        quick_actions = QHBoxLayout()
-        quick_actions.setSpacing(8)
-        for caption, command in (
-            ("◉  SPOTIFY", "Abra o Spotify"),
-            ("◉  WHATSAPP", "Abra o WhatsApp"),
-            ("⌕  PESQUISAR NA WEB", "Pesquise na web por assuntos atuais"),
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
+        for caption, request in (
+            ("♫  Spotify", "Abra o Spotify"),
+            ("▣  WhatsApp", "Abra o WhatsApp"),
+            ("⌕  Pesquisar", "Pesquise na web por assuntos atuais"),
+            ("▤  Documentos", "Abra a pasta de documentos"),
         ):
-            action_button = QPushButton(caption)
-            action_button.setObjectName("quickButton")
-            action_button.clicked.connect(
-                lambda checked=False, request=command: self.command_submitted.emit(request, False)
+            button = QPushButton(caption)
+            button.setObjectName("quickButton")
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.clicked.connect(
+                lambda checked=False, prompt=request: self.command_submitted.emit(prompt, False)
             )
-            quick_actions.addWidget(action_button)
-        root.addLayout(quick_actions)
+            actions.addWidget(button, 1)
+            self._quick_buttons.append(button)
+        root.addLayout(actions)
 
-        session_header = QHBoxLayout()
-        session_title = QLabel("CONVERSA")
-        session_title.setObjectName("sectionTitle")
-        session_header.addWidget(session_title)
-        session_header.addStretch(1)
-        self.session_label = QLabel("SESSÃO LOCAL")
-        self.session_label.setObjectName("sectionMeta")
-        session_header.addWidget(self.session_label)
-        root.addLayout(session_header)
+        conversation_header = QHBoxLayout()
+        conversation_title = QLabel("CONVERSA")
+        conversation_title.setObjectName("sectionTitle")
+        conversation_header.addWidget(conversation_title)
+        conversation_header.addStretch(1)
+        self.session_label = QLabel("HISTÓRICO DESTA SESSÃO")
+        self.session_label.setObjectName("sectionHint")
+        conversation_header.addWidget(self.session_label)
+        root.addLayout(conversation_header)
 
         self.chat = QTextBrowser()
         self.chat.setObjectName("chatHistory")
@@ -339,21 +312,25 @@ class HUDWindow(QMainWindow):
         self.chat.setFrameShape(QFrame.Shape.NoFrame)
         self.chat.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.chat.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.chat.setPlaceholderText("Sua conversa aparecerá aqui.")
+        self.chat.document().setMaximumBlockCount(500)
         root.addWidget(self.chat, 1)
 
-        composer = QHBoxLayout()
-        composer.setSpacing(8)
+        composer_frame = QFrame()
+        composer_frame.setObjectName("composerFrame")
+        composer = QHBoxLayout(composer_frame)
+        composer.setContentsMargins(8, 7, 8, 7)
+        composer.setSpacing(7)
+
         self.input_field = QLineEdit()
         self.input_field.setObjectName("commandInput")
-        self.input_field.setPlaceholderText("Converse com AURIX — escreva um pedido…")
+        self.input_field.setPlaceholderText("Peça algo, faça uma pergunta ou descreva uma tarefa…")
         self.input_field.setClearButtonEnabled(True)
         self.input_field.returnPressed.connect(self._submit_typed)
         composer.addWidget(self.input_field, 1)
 
         self.voice_button = QPushButton("◉  FALAR")
         self.voice_button.setObjectName("listenButton")
-        self.voice_button.setToolTip("Gravar um pedido agora, sem precisar dizer Hey Jarvis")
+        self.voice_button.setToolTip("Ditar um pedido agora, sem precisar dizer Hey Jarvis")
         self.voice_button.clicked.connect(self.listen_once_requested.emit)
         composer.addWidget(self.voice_button)
 
@@ -365,14 +342,15 @@ class HUDWindow(QMainWindow):
 
         self.send_button = QPushButton("ENVIAR  ↗")
         self.send_button.setObjectName("sendButton")
+        self.send_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.send_button.clicked.connect(self._submit_typed)
         composer.addWidget(self.send_button)
-        root.addLayout(composer)
+        root.addWidget(composer_frame)
 
         footer = QHBoxLayout()
-        footer_left = QLabel("AURIX AI  ·  PERSONAL DESKTOP ASSISTANT")
+        footer_left = QLabel("AURIX CORE  ·  CONTROLE LOCAL VALIDADO")
         footer_left.setObjectName("footer")
-        footer_key = QLabel("CTRL  +  ALT  +  SPACE")
+        footer_key = QLabel("CTRL  +  ALT  +  ESPAÇO")
         footer_key.setObjectName("footer")
         footer.addWidget(footer_left)
         footer.addStretch(1)
@@ -387,123 +365,108 @@ class HUDWindow(QMainWindow):
         self.setStyleSheet(
             """
             QFrame#shell {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #06111f, stop:0.52 #081a2b, stop:1 #040b14);
-                border: 1px solid rgba(86, 207, 238, 150);
+                background: #07121f;
+                border: 1px solid #214053;
                 border-radius: 20px;
             }
-            QLabel { color: #d8f5fc; background: transparent; }
-            QLabel#brand {
-                color: #9af3ff; font-family: "Segoe UI"; font-size: 19px;
-                font-weight: 700; letter-spacing: 5px;
+            QLabel { color: #dcecf5; background: transparent; }
+            QLabel#brandMark {
+                color: #081723; background: #8deaff; border: 1px solid #bcf6ff;
+                border-radius: 12px; font-size: 22px; font-weight: 800;
             }
-            QLabel#tagline { color: #648ca3; font-size: 8px; letter-spacing: 2px; }
+            QLabel#brand {
+                color: #e9f7fb; font-family: "Segoe UI"; font-size: 19px;
+                font-weight: 700; letter-spacing: 4px;
+            }
+            QLabel#tagline { color: #648398; font-size: 8px; letter-spacing: 2px; }
             QLabel#statusPill {
-                color: #77e9ff; background: rgba(30, 126, 154, 28);
-                border: 1px solid rgba(80, 208, 235, 92); border-radius: 11px;
+                color: #8eeaff; background: #0d2636;
+                border: 1px solid #244c60; border-radius: 10px;
                 padding: 7px 11px; font-size: 9px; font-weight: 700; letter-spacing: 1px;
             }
             QLabel#statusPill[state="listening"] {
-                color: #a7fff0; background: rgba(29, 154, 123, 35);
-                border-color: rgba(91, 245, 203, 140);
+                color: #a5f8e5; background: #0e302e; border-color: #28675e;
             }
             QLabel#statusPill[state="thinking"] {
-                color: #d0c0ff; background: rgba(110, 75, 171, 35);
-                border-color: rgba(178, 148, 255, 120);
+                color: #d5cbff; background: #211f3a; border-color: #49436d;
             }
             QLabel#statusPill[state="warning"] {
-                color: #ffcc9d; background: rgba(160, 83, 31, 35);
-                border-color: rgba(255, 168, 94, 140);
+                color: #ffd0a2; background: #35251b; border-color: #76513a;
             }
             QPushButton#iconButton {
-                min-width: 34px; max-width: 34px; min-height: 32px; max-height: 32px;
-                color: #8ab9c9; background: rgba(32, 90, 111, 28);
-                border: 1px solid rgba(75, 146, 168, 70); border-radius: 9px; font-size: 15px;
+                min-width: 34px; max-width: 34px; min-height: 33px; max-height: 33px;
+                color: #a8bfcb; background: #0b1c2a; border: 1px solid #233b4b;
+                border-radius: 9px; font-size: 15px;
             }
             QPushButton#iconButton:hover {
-                color: #efffff; background: rgba(64, 180, 211, 52);
-                border-color: rgba(96, 224, 246, 145);
+                color: #effcff; background: #15374a; border-color: #478ba4;
             }
-            QFrame#divider { background: rgba(70, 168, 200, 76); border: 0; }
+            QFrame#divider { background: #1c3445; border: 0; }
             QFrame#heroPanel {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 rgba(11, 39, 60, 210), stop:0.5 rgba(6, 25, 42, 225),
-                    stop:1 rgba(5, 16, 29, 230));
-                border: 1px solid rgba(62, 174, 207, 105); border-radius: 16px;
-            }
-            QFrame#telemetryCard {
-                background: rgba(2, 13, 24, 135);
-                border: 1px solid rgba(43, 115, 143, 72); border-radius: 8px;
-            }
-            QLabel#telemetryLabel {
-                color: #527e93; font-size: 7px; font-weight: 700; letter-spacing: 0.8px;
-            }
-            QLabel#telemetryValue {
-                color: #91efff; font-size: 10px; font-weight: 700; letter-spacing: 0.7px;
+                background: #0a1a29; border: 1px solid #1b394c; border-radius: 16px;
             }
             QLabel#eyebrow {
                 color: #66bed3; font-size: 9px; font-weight: 700; letter-spacing: 2px;
             }
             QLabel#heroTitle {
-                color: #e4faff; font-size: 25px; font-weight: 600; letter-spacing: -0.4px;
+                color: #f0f8fc; font-size: 24px; font-weight: 600; letter-spacing: -0.3px;
             }
-            QLabel#heroDescription { color: #91b2c4; font-size: 11px; line-height: 1.4; }
-            QLabel#metaChip {
-                color: #6394a9; background: rgba(25, 73, 92, 34);
-                border: 1px solid rgba(58, 124, 149, 70); border-radius: 6px;
-                padding: 5px 7px; font-size: 7px; letter-spacing: 0.7px;
+            QLabel#heroDescription { color: #9bb4c3; font-size: 11px; }
+            QLabel#capabilityChip {
+                color: #84c8d9; background: #102839; border: 1px solid #214658;
+                border-radius: 6px; padding: 5px 7px; font-size: 7px;
+                font-weight: 700; letter-spacing: 0.6px;
             }
+            QLabel#engineLabel { color: #5d899e; font-size: 8px; letter-spacing: 1px; }
             QLabel#sectionTitle {
-                color: #85ddef; font-size: 9px; font-weight: 700; letter-spacing: 2px;
+                color: #c2dfe9; font-size: 9px; font-weight: 700; letter-spacing: 2px;
             }
-            QLabel#sectionMeta { color: #4f7d91; font-size: 8px; letter-spacing: 1px; }
+            QLabel#sectionHint { color: #5d8193; font-size: 8px; letter-spacing: 0.7px; }
             QTextBrowser#chatHistory {
-                background: rgba(2, 11, 20, 150); color: #c9e6f0;
-                border: 1px solid rgba(44, 108, 132, 84); border-radius: 12px;
-                padding: 10px; selection-background-color: #0d6684;
-                font-family: "Segoe UI"; font-size: 11px;
+                background: #081520; color: #d3e6ee; border: 1px solid #193343;
+                border-radius: 12px; padding: 9px; selection-background-color: #176681;
+                font-family: "Segoe UI"; font-size: 12px;
+            }
+            QFrame#composerFrame {
+                background: #091a28; border: 1px solid #234a5d; border-radius: 13px;
             }
             QLineEdit#commandInput {
-                min-height: 22px; background: rgba(3, 14, 25, 230); color: #e4faff;
-                border: 1px solid rgba(56, 137, 163, 125); border-radius: 10px;
-                padding: 11px 13px; selection-background-color: #087fa5;
+                min-height: 24px; background: transparent; color: #e6f4f8;
+                border: 0; padding: 8px 9px; selection-background-color: #087fa5;
+                font-size: 11px;
             }
-            QLineEdit#commandInput:focus { border: 1px solid #5bdcf7; }
             QPushButton#quickButton {
-                color: #8bc8d9; background: rgba(10, 39, 56, 190);
-                border: 1px solid rgba(55, 132, 157, 85); border-radius: 8px;
-                padding: 9px 11px; font-size: 8px; font-weight: 700; letter-spacing: 0.7px;
+                color: #b1d0dc; background: #0b1e2c; border: 1px solid #203c4d;
+                border-radius: 9px; padding: 10px 11px; font-size: 10px; font-weight: 600;
             }
             QPushButton#quickButton:hover {
-                color: #dffbff; background: rgba(23, 105, 133, 110);
-                border-color: rgba(95, 218, 243, 155);
+                color: #f0fcff; background: #103347; border-color: #3d8198;
             }
+            QPushButton#quickButton:disabled { color: #4e7181; background: #0b1924; }
             QPushButton#listenButton {
-                color: #071723; background: #80eaff; border: 1px solid #b7f8ff;
-                border-radius: 9px; padding: 10px 13px; font-size: 9px;
-                font-weight: 800; letter-spacing: 0.6px;
+                color: #061824; background: #8ce9fb; border: 1px solid #b8f5ff;
+                border-radius: 9px; padding: 10px 12px; font-size: 9px; font-weight: 800;
             }
-            QPushButton#listenButton:hover { background: #b0f4ff; }
+            QPushButton#listenButton:hover { background: #b5f4ff; }
             QPushButton#listenButton:disabled {
-                color: #547b8c; background: #102736; border-color: #24485a;
+                color: #65818e; background: #17303d; border-color: #254452;
             }
             QPushButton#voiceButton {
-                color: #9bdbea; background: rgba(24, 79, 99, 55);
-                border: 1px solid rgba(74, 157, 181, 110); border-radius: 9px;
-                padding: 10px 11px; font-size: 8px; font-weight: 700; letter-spacing: 0.4px;
+                color: #9dc5d3; background: #102433; border: 1px solid #254759;
+                border-radius: 9px; padding: 10px 10px; font-size: 8px; font-weight: 700;
             }
             QPushButton#voiceButton[enabled="true"] {
-                color: #a6fff1; background: rgba(23, 132, 109, 60);
-                border-color: rgba(95, 241, 203, 140);
+                color: #a6f7e4; background: #12352f; border-color: #2b786c;
             }
             QPushButton#sendButton {
-                color: #f0fdff; background: #0a6d8a; border: 1px solid #52d7ef;
-                border-radius: 9px; padding: 10px 15px; font-size: 9px;
-                font-weight: 700; letter-spacing: 1px;
+                color: #e6f8fc; background: #123c51; border: 1px solid #367b96;
+                border-radius: 9px; padding: 10px 13px; font-size: 9px; font-weight: 700;
             }
-            QPushButton#sendButton:hover { background: #0d86a8; }
-            QPushButton#sendButton:disabled { color: #547b8c; background: #102736; border-color: #24485a; }
-            QLabel#footer { color: #456f82; font-size: 8px; letter-spacing: 1px; }
+            QPushButton#sendButton:hover { background: #19556e; border-color: #56bbd6; }
+            QPushButton#sendButton:disabled {
+                color: #65818e; background: #102432; border-color: #213a49;
+            }
+            QLabel#footer { color: #496b7d; font-size: 8px; letter-spacing: 0.8px; }
             """
         )
 
@@ -511,11 +474,12 @@ class HUDWindow(QMainWindow):
         self.set_voice_enabled(False)
         self.append_message(
             "AURIX",
-            "Olá. Estou aqui. Diga o que você quer fazer ou pergunte qualquer coisa.",
+            "Olá. Sou sua assistente de desktop. Peça algo em linguagem natural; quando uma ação "
+            "não estiver disponível, vou explicar o limite em vez de fingir que a executei.",
         )
 
     def _shell_mouse_press(self, event) -> None:
-        if event.button() == Qt.MouseButton.LeftButton and event.position().y() < 62:
+        if event.button() == Qt.MouseButton.LeftButton and event.position().y() < 60:
             self._drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             event.accept()
         else:
@@ -534,11 +498,9 @@ class HUDWindow(QMainWindow):
 
     def show_hud(self) -> None:
         screen = QApplication.primaryScreen()
-        if screen:
+        if screen and not self.isVisible():
             area = screen.availableGeometry()
-            # Center only the first time; preserve the user's chosen position afterward.
-            if not self.isVisible():
-                self.move(area.center().x() - self.width() // 2, area.center().y() - self.height() // 2)
+            self.move(area.center().x() - self.width() // 2, area.center().y() - self.height() // 2)
         self.show()
         self.raise_()
         self.activateWindow()
@@ -547,67 +509,56 @@ class HUDWindow(QMainWindow):
     def set_status(self, text: str) -> None:
         self.status_label_text = text
         lower = text.casefold()
-        if any(word in lower for word in ("ouvindo", "ativado", "transcrevendo", "voz inicializada")):
-            state, label, mode = "listening", "●  LISTENING", "listening"
-        elif any(word in lower for word in ("processando", "pensando", "baixando modelo")):
-            state, label, mode = "thinking", "◌  THINKING", "thinking"
-        elif any(word in lower for word in ("erro", "falha", "não consegui", "nao consegui", "recusada")):
-            state, label, mode = "warning", "●  ATTENTION", "warning"
+        if any(word in lower for word in ("ouvindo", "ativado", "transcrevendo", "capturando")):
+            state, label, mode = "listening", "●  OUVINDO", "listening"
+        elif any(word in lower for word in ("processando", "pensando", "baixando", "verificando modelo", "preparando ia", "modelo pronto")):
+            state, label, mode = "thinking", "◌  PROCESSANDO", "thinking"
+        elif any(word in lower for word in ("erro", "falha", "não consegui", "nao consegui", "recusada", "não foi possível")):
+            state, label, mode = "warning", "●  ATENÇÃO", "warning"
         else:
-            state, label, mode = "ready", "●  STANDBY", "idle"
+            state, label, mode = "ready", "●  ONLINE", "idle"
+
         self.status_pill.setText(label)
         self.status_pill.setProperty("state", state)
         self.status_pill.style().unpolish(self.status_pill)
         self.status_pill.style().polish(self.status_pill)
         self.core.set_mode(mode)
+
         if state == "listening":
             self.hero_title.setText("Estou ouvindo você.")
-            self.engine_value.setText("LISTENING")
-            self.voice_value.setText("CAPTURING")
+            self.engine_value.setText("CANAL DE VOZ ATIVO")
         elif state == "thinking":
-            self.hero_title.setText("Pensando com você.")
-            self.engine_value.setText("PROCESSING")
+            self.hero_title.setText("Estou cuidando disso.")
+            self.engine_value.setText(text.upper()[:100])
         elif state == "warning":
-            self.hero_title.setText("Preciso da sua atenção.")
-            self.engine_value.setText("CHECK STATUS")
-            if any(term in lower for term in ("microfone", "voz", "hey jarvis", "transcri")):
-                self.voice_value.setText("CHECK MIC")
+            self.hero_title.setText("Preciso conferir algo.")
+            self.engine_value.setText("VEJA O STATUS OU A RESPOSTA")
         else:
-            self.hero_title.setText("Inteligência ao seu comando.")
-            self.engine_value.setText("ONLINE")
-            if not self._voice_enabled:
-                self.voice_value.setText("READY")
-            self.action_value.setText("ARMED")
+            self.hero_title.setText("O que vamos fazer hoje?")
+            self.engine_value.setText("IA GENERATIVA · FERRAMENTAS CONTROLADAS")
 
     def set_response(self, text: str) -> None:
-        # Assistant responses are appended to the session timeline.
         self.append_message("AURIX", text)
 
     def append_message(self, speaker: str, text: str) -> None:
         safe_text = html.escape(str(text)).replace("\n", "<br>")
-        if speaker.casefold() == "você":
-            bubble_color = "#102b3d"
-            title_color = "#8ddcf0"
-            alignment = "right"
-            label = "VOCÊ"
-        else:
-            bubble_color = "#0b1d2d"
-            title_color = "#70dced"
-            alignment = "left"
-            label = speaker.upper() if speaker else "AURIX"
-
+        is_user = speaker.casefold() == "você"
+        bubble_color = "#102a3a" if is_user else "#0d202d"
+        border_color = "#2c6176" if is_user else "#1d3c4c"
+        title_color = "#9adff0" if is_user else "#83dce9"
+        alignment = "right" if is_user else "left"
+        label = "VOCÊ" if is_user else (speaker.upper() if speaker else "AURIX")
         timestamp = datetime.now().strftime("%H:%M")
         self.chat.append(
-            f'<div style="margin: 7px 2px 12px 2px; text-align: {alignment};">'
-            f'<span style="color:{title_color}; font-size:9px; letter-spacing:1px; font-weight:700;">'
-            f'{html.escape(label)}  /  {timestamp}</span><br>'
-            f'<span style="display:inline-block; max-width:92%; background:{bubble_color}; '
-            f'border:1px solid #1d475b; border-radius:10px; padding:9px 11px; '
-            f'color:#d0e9f2; font-size:11px; line-height:1.5;">{safe_text}</span>'
-            '</div>'
+            f'<div style="margin:7px 3px 12px 3px; text-align:{alignment};">'
+            f'<div style="color:{title_color}; font-size:9px; font-weight:700; letter-spacing:1px; '
+            f'margin-bottom:4px;">{html.escape(label)} <span style="color:#527386; font-weight:400;">· {timestamp}</span></div>'
+            f'<div style="display:inline-block; max-width:94%; background:{bubble_color}; '
+            f'border:1px solid {border_color}; border-radius:11px; padding:9px 12px; '
+            f'color:#d7e8ef; font-size:11px; line-height:1.45;">{safe_text}</div></div>'
         )
         self._message_count += 1
-        self.session_label.setText(f"SESSÃO LOCAL  ·  {self._message_count:02d} MENSAGENS")
+        self.session_label.setText(f"{self._message_count:02d} MENSAGENS NESTA SESSÃO")
         bar = self.chat.verticalScrollBar()
         bar.setValue(bar.maximum())
 
@@ -618,15 +569,17 @@ class HUDWindow(QMainWindow):
         self.wake_button.style().unpolish(self.wake_button)
         self.wake_button.style().polish(self.wake_button)
         self.wake_button.setToolTip(
-            "Pausar a palavra de ativação em segundo plano" if enabled
-            else "Ativar a palavra de ativação em segundo plano"
+            "Pausar a palavra de ativação em segundo plano"
+            if enabled else "Ativar a palavra de ativação em segundo plano"
         )
-        self.voice_value.setText("WAKE ON" if enabled else "READY")
 
     def set_busy(self, busy: bool) -> None:
         self.send_button.setEnabled(not busy)
         self.input_field.setEnabled(not busy)
-        self.send_button.setText("PROCESSANDO…" if busy else "ENVIAR  ↗")
+        self.voice_button.setEnabled(not busy)
+        for button in self._quick_buttons:
+            button.setEnabled(not busy)
+        self.send_button.setText("AGUARDE…" if busy else "ENVIAR  ↗")
         if busy:
             self.set_status("Processando solicitação…")
 

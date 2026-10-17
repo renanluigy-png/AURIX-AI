@@ -24,14 +24,14 @@ from aurix.config import Settings
 
 
 class SetupDialog(QDialog):
-    """Configure AI provider and microphone behavior before starting the assistant."""
+    """Configure the generative AI provider and microphone behavior."""
 
     def __init__(self, settings: Settings, parent=None) -> None:
         super().__init__(parent)
         self.settings = settings
         self._ollama_process: QProcess | None = None
         self._ollama_output = ""
-        self.setWindowTitle("Configuração inicial · AURIX AI")
+        self.setWindowTitle("Configuração · AURIX AI")
         self.setMinimumWidth(580)
         self.setModal(True)
 
@@ -39,15 +39,16 @@ class SetupDialog(QDialog):
         root.setContentsMargins(26, 24, 26, 22)
         root.setSpacing(13)
 
-        title = QLabel("Vamos preparar o AURIX")
+        title = QLabel("Prepare sua inteligência")
         title.setFont(QFont("Segoe UI", 19, QFont.Weight.DemiBold))
-        title.setStyleSheet("color: #80f0ff;")
+        title.setStyleSheet("color: #8deaff;")
         root.addWidget(title)
 
         intro = QLabel(
-            "Escolha o provedor de IA e configure a voz. Para IA local, o Qwen 2.5 7B oferece "
-            "respostas e uso de ferramentas geralmente melhores que o modelo pequeno anterior, "
-            "mas baixa vários GB na primeira conversa. O microfone só será usado conforme sua escolha."
+            "O AURIX usa um modelo de IA generativa real para conversar e selecionar ferramentas. "
+            "Para uso local, o Qwen 2.5 3B é o perfil recomendado para responder com mais agilidade "
+            "e usar menos recursos que um modelo 7B. O modelo escolhido é baixado na primeira conversa; "
+            "o aplicativo permanece utilizável durante esse processo."
         )
         intro.setWordWrap(True)
         intro.setStyleSheet("color: #b8cedb;")
@@ -58,7 +59,7 @@ class SetupDialog(QDialog):
         self.provider = QComboBox()
         self.provider.addItem("Ollama · IA local no computador", "ollama")
         self.provider.addItem("OpenAI API · IA online", "openai")
-        self.provider.addItem("Configurar depois · sem conversa com IA", "none")
+        self.provider.addItem("Configurar depois · ações simples apenas", "none")
         index = self.provider.findData(settings.llm_provider)
         self.provider.setCurrentIndex(index if index >= 0 else 0)
         self.provider.currentIndexChanged.connect(self._update_provider_ui)
@@ -75,8 +76,8 @@ class SetupDialog(QDialog):
         )
         form.addRow("", self.key_help)
 
-        self.ollama_model = QLineEdit(settings.ollama_model or "qwen2.5:7b")
-        self.ollama_model.setPlaceholderText("Ex.: qwen2.5:7b")
+        self.ollama_model = QLineEdit(settings.ollama_model or "qwen2.5:3b")
+        self.ollama_model.setPlaceholderText("Recomendado: qwen2.5:3b · opção avançada: qwen2.5:7b")
         form.addRow("Modelo local", self.ollama_model)
 
         self.ollama_install = QPushButton("Instalar Ollama neste computador")
@@ -108,7 +109,8 @@ class SetupDialog(QDialog):
             "Privacidade: a ativação por voz começa desativada. Ao habilitá-la, o detector "
             "processa o áudio localmente; com transcrição local, o pedido não é enviado a um "
             "serviço de reconhecimento. Se escolher Google, o áudio do pedido é enviado ao "
-            "serviço para transcrição. O acesso ao microfone depende das configurações do Windows."
+            "serviço para transcrição. A chave da OpenAI é guardada no armazenamento de credenciais "
+            "do Windows. O acesso ao microfone depende das configurações do Windows."
         )
         privacy.setWordWrap(True)
         privacy.setStyleSheet(
@@ -172,15 +174,16 @@ class SetupDialog(QDialog):
         self.ollama_status.setVisible(provider == "ollama")
         if provider == "ollama":
             self.ollama_status.setText(
-                "Ollama detectado neste PC." if self._is_ollama_installed()
-                else "O runtime de IA local precisa ser instalado uma vez. Você pode autorizar a instalação aqui."
+                "Ollama detectado. Na primeira conversa, o AURIX verificará e baixará o modelo selecionado."
+                if self._is_ollama_installed()
+                else "O runtime Ollama precisa ser instalado uma vez. Depois, o AURIX baixa o modelo selecionado quando você iniciar a primeira conversa."
             )
 
     def _install_ollama(self) -> None:
         if self._is_ollama_installed():
             QMessageBox.information(
                 self, "Ollama encontrado",
-                "O Ollama já está instalado. O AURIX verificará o modelo na primeira conversa."
+                "O Ollama já está instalado. O AURIX verificará o modelo selecionado na primeira conversa."
             )
             self.ollama_status.setText("Ollama detectado neste PC.")
             return
@@ -220,7 +223,7 @@ class SetupDialog(QDialog):
         self._ollama_process.readyReadStandardError.connect(self._read_ollama_output)
         self._ollama_process.finished.connect(self._ollama_finished)
         self.ollama_install.setEnabled(False)
-        self.ollama_status.setText("Instalando Ollama pelo winget… Você pode continuar acompanhando aqui.")
+        self.ollama_status.setText("Instalando Ollama pelo winget… Você pode acompanhar por aqui.")
         self._ollama_process.start()
 
     def _read_ollama_output(self) -> None:
@@ -234,18 +237,17 @@ class SetupDialog(QDialog):
     def _ollama_finished(self, exit_code: int, _exit_status) -> None:
         self.ollama_install.setEnabled(True)
         if exit_code == 0 and self._is_ollama_installed():
-            self.ollama_status.setText("Instalação concluída. O AURIX poderá baixar o modelo de IA ao iniciar uma conversa.")
+            self.ollama_status.setText("Instalação concluída. O modelo será verificado na primeira conversa.")
             QMessageBox.information(
                 self, "Ollama instalado",
-                "O runtime Ollama foi instalado. O AURIX tentará usar esse serviço e buscar "
-                "o modelo escolhido quando você iniciar uma conversa."
+                "O runtime Ollama foi instalado. O AURIX baixará o modelo escolhido caso ainda não exista."
             )
         else:
             self.ollama_status.setText("A instalação não foi confirmada. Confira a conexão e tente novamente.")
             QMessageBox.warning(
                 self, "Instalação do Ollama",
-                "Não consegui confirmar que o Ollama foi instalado. Se o instalador do Ollama "
-                "abriu uma janela do Windows, conclua-a e clique em Instalar novamente.\n\n"
+                "Não consegui confirmar que o Ollama foi instalado. Se o instalador do Ollama abriu "
+                "uma janela do Windows, conclua-a e clique em Instalar novamente.\n\n"
                 + self._ollama_output[-1200:]
             )
 
@@ -293,7 +295,8 @@ class SetupDialog(QDialog):
             return False
 
         self.settings.llm_provider = provider
-        self.settings.ollama_model = self.ollama_model.text().strip() or "llama3.2"
+        self.settings.ollama_model = self.ollama_model.text().strip() or "qwen2.5:3b"
+        self.settings.performance_migrated = True
         self.settings.speech_provider = str(self.speech_provider.currentData())
         self.settings.wake_word_enabled = self.wake_word.isChecked()
         self.settings.start_with_windows = self.start_windows.isChecked()
@@ -311,5 +314,6 @@ class SetupDialog(QDialog):
         self.settings.speech_provider = str(self.speech_provider.currentData())
         self.settings.llm_provider = "none"
         self.settings.first_run_complete = True
+        self.settings.performance_migrated = True
         self.settings.save()
         self.accept()

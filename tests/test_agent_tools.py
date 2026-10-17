@@ -29,6 +29,14 @@ class AgentToolTests(unittest.TestCase):
         result = execute_tool("open_website", {"url": "file:///C:/Windows/win.ini"})
         self.assertIn("recusada", result.lower())
 
+    def test_media_tool_rejects_unknown_action(self):
+        result = execute_tool("control_media", {"action": "delete_everything"})
+        self.assertIn("recusada", result.lower())
+
+    def test_media_tool_requires_action(self):
+        result = execute_tool("control_media", {})
+        self.assertIn("inválidos", result.lower())
+
     def test_create_note_requires_title_and_content(self):
         result = execute_tool("create_note", {"title": "", "content": ""})
         self.assertIn("não criei", result.lower())
