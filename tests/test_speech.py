@@ -2,6 +2,7 @@
 
 import hashlib
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -62,17 +63,21 @@ class SpeechHelperTests(unittest.TestCase):
             build_phoneme_chunks("a", {"a": 1}, max_tokens=0)
 
     def test_synthesis_failure_still_schedules_model_release(self):
-        with patch.object(speech, "_engine", object()), patch.object(
-            speech, "_make_audio", side_effect=RuntimeError("phonemizer failed")
-        ), patch.object(speech, "_schedule_engine_release") as schedule_release:
+        with patch.dict("sys.modules", {"numpy": types.ModuleType("numpy")}), patch.object(
+            speech, "_engine", object()
+        ), patch.object(speech, "_make_audio", side_effect=RuntimeError("phonemizer failed")), patch.object(
+            speech, "_schedule_engine_release"
+        ) as schedule_release:
             with self.assertRaisesRegex(RuntimeError, "phonemizer failed"):
                 speech.synthesize_to_wav("Olá AURIX", Path(tempfile.gettempdir()) / "never-created.wav")
         schedule_release.assert_called_once()
 
     def test_synthesis_failure_without_loaded_model_does_not_schedule_release(self):
-        with patch.object(speech, "_engine", None), patch.object(
-            speech, "_make_audio", side_effect=RuntimeError("model unavailable")
-        ), patch.object(speech, "_schedule_engine_release") as schedule_release:
+        with patch.dict("sys.modules", {"numpy": types.ModuleType("numpy")}), patch.object(
+            speech, "_engine", None
+        ), patch.object(speech, "_make_audio", side_effect=RuntimeError("model unavailable")), patch.object(
+            speech, "_schedule_engine_release"
+        ) as schedule_release:
             with self.assertRaisesRegex(RuntimeError, "model unavailable"):
                 speech.synthesize_to_wav("Olá AURIX", Path(tempfile.gettempdir()) / "never-created.wav")
         schedule_release.assert_not_called()
