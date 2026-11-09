@@ -308,22 +308,9 @@ class AurixController(QObject):
 
     @staticmethod
     def _speak(text: str) -> None:
-        try:
-            import pyttsx3
+        from aurix.speech import speak_text
 
-            engine = pyttsx3.init()
-            engine.setProperty("rate", 178)
-            for voice in engine.getProperty("voices"):
-                name = (getattr(voice, "name", "") or "").casefold()
-                language = " ".join(str(item) for item in getattr(voice, "languages", [])).casefold()
-                if "brazil" in name or "portugu" in name or "pt_br" in language:
-                    engine.setProperty("voice", voice.id)
-                    break
-            engine.say(text[:1200])
-            engine.runAndWait()
-            engine.stop()
-        except Exception:
-            logging.exception("Text-to-speech failed")
+        speak_text(text)
 
     @Slot()
     def _listen_once_from_hud(self) -> None:

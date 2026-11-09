@@ -47,6 +47,8 @@ Instale o [Ollama para Windows](https://ollama.com/download/windows) e mantenha-
 
 - A detecção da frase de ativação é feita localmente. O modelo pré-treinado incluído reconhece **“Hey Jarvis”**, e não somente “Jarvis”.
 - Para reconhecimento de fala em português sem enviar seu pedido a um serviço externo, escolha **Local**. Na primeira solicitação por voz, o AURIX baixa o modelo Vosk de português (aproximadamente 31 MB) para a pasta de dados do usuário.
+- A fala de resposta usa **Piper Plus** com uma voz neural pt-BR. O modelo Faber Medium (aproximadamente 63 MB) é baixado uma vez, verificado por SHA-256 e armazenado no perfil do usuário. Depois disso, a síntese e a reprodução acontecem localmente, sem enviar texto ou áudio para serviços externos.
+- Se o modelo neural não puder ser carregado, o AURIX tenta usar a voz instalada no Windows como alternativa.
 - A opção Google usa um serviço externo para transcrever o áudio capturado depois da ativação.
 - A escuta de ativação pode ser pausada no menu da bandeja. As permissões de microfone são controladas pelo Windows; a configuração inicial fornece um atalho para as opções de privacidade.
 - Fechar o HUD apenas o oculta. Para encerrar o processo, use **Sair do AURIX** no menu da bandeja.
@@ -55,7 +57,8 @@ Instale o [Ollama para Windows](https://ollama.com/download/windows) e mantenha-
 
 - **Ctrl + Alt + Espaço**: abrir o HUD.
 - **Ícone na bandeja**: abrir o HUD, pausar/retomar a escuta, configurar IA/voz, definir inicialização automática ou sair.
-- Ao chamar por voz, o AURIX mostra o HUD, transcreve o pedido, usa ferramentas quando necessário e fala a resposta.
+- Ao chamar por voz, o AURIX mostra o HUD, transcreve o pedido localmente com Vosk (na configuração padrão), conversa com o modelo Ollama local, usa ferramentas quando necessário e fala a resposta com Piper Plus.
+- A voz neural é baixada sob demanda na primeira resposta falada; a detecção contínua “Hey Jarvis” começa desativada e pode ser pausada na bandeja.
 
 ## Desenvolvimento a partir do código-fonte
 
@@ -91,7 +94,7 @@ python -m unittest discover -s tests -v
 
 ## Estado do MVP
 
-Os testes automáticos verificam compilação sintática e a validação de ferramentas. Áudio real, permissões, instalação do Ollama e abertura dos programas precisam ser verificados em um Windows de destino. O modelo de ativação pré-treinado do openWakeWord tem licença CC BY-NC-SA 4.0; antes de redistribuir comercialmente, verifique a licença do modelo ou substitua-o por um modelo com licença adequada. O reconhecimento por voz depende do microfone e o uso da OpenAI API depende de uma chave válida. A automação foi mantida deliberadamente limitada por segurança.
+Os testes automáticos verificam compilação sintática e a validação de ferramentas. Áudio real, permissões, instalação do Ollama e abertura dos programas precisam ser verificados em um Windows de destino. O modelo de ativação pré-treinado do openWakeWord tem licença CC BY-NC-SA 4.0; antes de redistribuir comercialmente, verifique a licença do modelo ou substitua-o por um modelo com licença adequada. O modelo de voz Faber é obtido do repositório Piper Voices (metadados MIT; o dataset de treinamento está marcado como CC0). Veja `THIRD_PARTY_NOTICES.md`. O reconhecimento por voz depende do microfone e o uso da OpenAI API depende de uma chave válida. A automação foi mantida deliberadamente limitada por segurança.
 
 ## Licença
 
