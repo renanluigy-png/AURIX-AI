@@ -18,7 +18,52 @@ if not _ENV_FILE.is_file():
 load_dotenv(_ENV_FILE, override=False)
 
 APP_NAME = "AURIX AI"
-APP_DATA_DIR = Path(os.getenv("APPDATA", str(Path.home() / "AppData" / "Roaming"))) / "AurixAI"
+
+
+def _get_package_family_name() -> str | None:
+    """Return the MSIX package family name, or None for a classic desktop install."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        get_family = ctypes.windll.kernel32.GetCurrentPackageFamilyName
+        get_family.argtypes = [ctypes.POINTER(wintypes.UINT), wintypes.LPWSTR]
+        get_family.restype = wintypes.LONG
+        length = wintypes.UINT(0)
+        result = int(get_family(ctypes.byref(length), None))
+        if result == 15700:  # APPMODEL_ERROR_NO_PACKAGE
+            return None
+        if result != 122 or length.value <= 1:  # ERROR_INSUFFICIENT_BUFFER
+            return None
+        buffer = ctypes.create_unicode_buffer(length.value)
+        result = int(get_family(ctypes.byref(length), buffer))
+        return buffer.value if result == 0 and buffer.value else None
+    except Exception:
+        return None
+
+
+PACKAGE_FAMILY_NAME = _get_package_family_name()
+
+
+def is_packaged_app() -> bool:
+    """True when AURIX is running with an MSIX package identity."""
+    return bool(PACKAGE_FAMILY_NAME)
+
+
+def _resolve_app_data_dir() -> Path:
+    override = os.getenv("AURIX_DATA_DIR")
+    if override:
+        return Path(override).expanduser()
+    if PACKAGE_FAMILY_NAME:
+        local_app_data = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
+        return local_app_data / "Packages" / PACKAGE_FAMILY_NAME / "LocalState" / "AurixAI"
+    roaming = Path(os.getenv("APPDATA", str(Path.home() / "AppData" / "Roaming")))
+    return roaming / "AurixAI"
+
+
+APP_DATA_DIR = _resolve_app_data_dir()
 SETTINGS_PATH = APP_DATA_DIR / "settings.json"
 LOG_PATH = APP_DATA_DIR / "aurix.log"
 
@@ -103,7 +148,7 @@ def _startup_command() -> str:
 
 
 def is_start_with_windows_enabled() -> bool:
-    if sys.platform != "win32":
+    if sys.platform != "win32" or is_packaged_app():
         return False
     try:
         import winreg
@@ -121,7 +166,9 @@ def is_start_with_windows_enabled() -> bool:
 
 
 def set_start_with_windows(enabled: bool) -> tuple[bool, str]:
-    """Add or remove the current-user startup entry; never requires admin rights."""
+    """Configure classic startup registration; MSIX startup is managed by Windows."""
+    if is_packaged_app():
+        return False, "A inicialização automática desta versão é gerenciada pelo Windows."
     if sys.platform != "win32":
         return False, "A inicialização automática só é configurada no Windows."
 
