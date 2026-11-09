@@ -16,7 +16,11 @@ from pathlib import Path
 from typing import Callable
 from urllib.request import Request, urlopen
 
-from aurix.config import APP_DATA_DIR
+def _app_data_dir() -> Path:
+    """Resolve the user data directory only when speech is actually used."""
+    from aurix.config import APP_DATA_DIR
+
+    return APP_DATA_DIR
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -118,7 +122,7 @@ def _download_file(
 
 
 def _voice_paths() -> tuple[Path, Path]:
-    directory = APP_DATA_DIR / "models" / "piper"
+    directory = _app_data_dir() / "models" / "piper"
     return directory / MODEL_FILENAME, directory / CONFIG_FILENAME
 
 
@@ -227,11 +231,12 @@ def speak_text(
     try:
         with _voice_lock:
             voice = _load_voice(status_callback)
-            APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+            app_data_dir = _app_data_dir()
+            app_data_dir.mkdir(parents=True, exist_ok=True)
             with tempfile.NamedTemporaryFile(
                 prefix="aurix-voice-",
                 suffix=".wav",
-                dir=APP_DATA_DIR,
+                dir=app_data_dir,
                 delete=False,
             ) as temporary:
                 audio_path = Path(temporary.name)
