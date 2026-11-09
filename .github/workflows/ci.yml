@@ -78,6 +78,33 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path "dist-installer/AURIX-AI-Setup.exe")) { throw "O instalador do AURIX não foi criado." }
 
+      - name: Install MSIX asset generator
+        run: python -m pip install pillow
+
+      - name: Build and validate Microsoft Store MSIX package
+        shell: pwsh
+        env:
+          AURIX_MSIX_IDENTITY_NAME: ${{ vars.AURIX_MSIX_IDENTITY_NAME }}
+          AURIX_MSIX_PUBLISHER: ${{ vars.AURIX_MSIX_PUBLISHER }}
+          AURIX_MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.AURIX_MSIX_PUBLISHER_DISPLAY_NAME }}
+        run: |
+          $buildText = Get-Content "aurix/build_info.py" -Raw
+          $versionMatch = [regex]::Match($buildText, 'APP_VERSION\s*=\s*"([^"]+)"')
+          if (-not $versionMatch.Success) { throw "APP_VERSION não foi encontrado." }
+          $versionParts = @($versionMatch.Groups[1].Value.Split('.'))
+          while ($versionParts.Count -lt 4) { $versionParts += "0" }
+          $msixVersion = ($versionParts | Select-Object -First 4) -join "."
+          & .\packaging\msix\build-msix.ps1 -ExecutablePath "dist\AURIX-AI.exe" -OutputPath "dist-msix\AURIX-AI.msix" -Version $msixVersion
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path "dist-msix\AURIX-AI.msix")) { throw "O pacote MSIX não foi criado." }
+
+      - name: Upload Microsoft Store MSIX candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: AURIX-AI-MSIX-Store-Package
+          path: dist-msix/AURIX-AI.msix
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
         with:
