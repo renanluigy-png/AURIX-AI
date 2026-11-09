@@ -23,7 +23,7 @@ jobs:
       - name: Set package version
         shell: pwsh
         run: |
-          $version = "0.4.$env:GITHUB_RUN_NUMBER.0"
+          $version = "0.4.$($env:GITHUB_RUN_NUMBER).0"
           $buildInfo = 'APP_VERSION = "' + $version + '"' + [Environment]::NewLine
           [System.IO.File]::WriteAllText("aurix/build_info.py", $buildInfo, [System.Text.UTF8Encoding]::new($false))
           "version=$version" >> $env:GITHUB_OUTPUT
@@ -54,7 +54,7 @@ jobs:
           AURIX_MSIX_PUBLISHER: ${{ vars.AURIX_MSIX_PUBLISHER }}
           AURIX_MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.AURIX_MSIX_PUBLISHER_DISPLAY_NAME }}
         run: |
-          & .\packaging\msix\build-msix.ps1 -ExecutablePath "dist\AURIX-AI.exe" -OutputPath "dist-msix\AURIX-AI.msix" -Version "0.4.$env:GITHUB_RUN_NUMBER.0"
+          & .\packaging\msix\build-msix.ps1 -ExecutablePath "dist\AURIX-AI.exe" -OutputPath "dist-msix\AURIX-AI.msix" -Version $version
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path "dist-msix\AURIX-AI.msix")) { throw "O pacote MSIX não foi criado." }
 
       - name: Upload Microsoft Store package candidate
