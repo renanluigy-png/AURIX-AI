@@ -4,15 +4,13 @@ Assistente pessoal de desktop para Windows, inspirado em interfaces sci-fi, com 
 
 ## Quero apenas instalar o aplicativo
 
-O AURIX é empacotado para Windows com seu runtime Python e bibliotecas. O computador não precisa ter Git ou Python instalados.
+A distribuição pública do AURIX está migrando para **Microsoft Store (MSIX)** para fornecer assinatura confiável, instalação limpa e atualizações gerenciadas. O pacote de produção só poderá ser publicado depois da reserva da identidade do aplicativo e da certificação no Partner Center.
 
-1. Abra [Releases](https://github.com/renanluigy-png/AURIX-AI/releases/latest).
-2. Baixe o arquivo `AURIX-AI-Setup.exe` da versão mais recente.
-3. Execute o instalador e siga as etapas.
+- Consulte o processo em [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+- Os pacotes MSIX de CI são artefatos de validação, não instaladores finais.
+- Não instale o executável/instalador unsigned dos artefatos de Pull Request. Em computadores com Smart App Control, arquivos sem assinatura confiável podem ser bloqueados.
 
-Depois de instalar uma versão que tenha o atualizador integrado, o AURIX consulta as publicações oficiais ao iniciar. Se houver uma versão mais nova, ele mostra um aviso e oferece baixar e abrir o instalador; a atualização só acontece depois da sua confirmação. É necessário estar conectado à internet. O atualizador aceita somente o endereço oficial e, quando o GitHub fornece SHA-256, verifica o hash antes de abrir o arquivo.
-
-[Ver os builds do Windows](https://github.com/renanluigy-png/AURIX-AI/actions/workflows/windows-installer.yml)
+[Ver os builds do MSIX no GitHub Actions](https://github.com/renanluigy-png/AURIX-AI/actions/workflows/windows-installer.yml)
 
 ## O que é o AURIX
 
