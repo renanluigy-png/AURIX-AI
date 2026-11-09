@@ -54,7 +54,7 @@ $manifestText = $manifestText.Replace("__VERSION__", $Version)
 python (Join-Path $PSScriptRoot "generate_assets.py") $stage
 if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar os ícones do pacote MSIX." }
 
-$windowsKits = Join-Path $env:ProgramFiles(x86) "Windows Kits\10\bin"
+$windowsKits = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
 $makeAppx = Get-ChildItem -Path $windowsKits -Filter "MakeAppx.exe" -Recurse -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -match '\\x64\\MakeAppx\.exe$' } |
     Sort-Object FullName -Descending | Select-Object -First 1
