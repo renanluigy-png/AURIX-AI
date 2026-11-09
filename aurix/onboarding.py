@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from aurix.config import Settings
+from aurix.config import Settings, is_packaged_app
 
 
 class SetupDialog(QDialog):
@@ -110,6 +110,7 @@ class SetupDialog(QDialog):
 
         self.start_windows = QCheckBox("Iniciar o AURIX automaticamente com o Windows")
         self.start_windows.setChecked(settings.start_with_windows)
+        self.start_windows.setVisible(not is_packaged_app())
         root.addWidget(self.start_windows)
 
         privacy = QLabel(
@@ -307,7 +308,7 @@ class SetupDialog(QDialog):
         self.settings.speech_provider = str(self.speech_provider.currentData())
         self.settings.tts_enabled = self.tts_enabled.isChecked()
         self.settings.wake_word_enabled = self.wake_word.isChecked()
-        self.settings.start_with_windows = self.start_windows.isChecked()
+        self.settings.start_with_windows = self.start_windows.isChecked() if not is_packaged_app() else False
         self.settings.first_run_complete = True
         self.settings.save()
         self.accept()
