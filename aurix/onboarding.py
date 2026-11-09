@@ -319,7 +319,7 @@ class SetupDialog(QDialog):
 
     def _continue_without_ai(self) -> None:
         self.settings.wake_word_enabled = self.wake_word.isChecked()
-        self.settings.start_with_windows = self.start_windows.isChecked()
+        self.settings.start_with_windows = self.start_windows.isChecked() if not is_packaged_app() else False
         self.settings.speech_provider = str(self.speech_provider.currentData())
         self.settings.tts_enabled = self.tts_enabled.isChecked()
         self.settings.llm_provider = "none"
