@@ -49,7 +49,7 @@ class SetupDialog(QDialog):
             "Para uso local, o Qwen 2.5 3B é o perfil recomendado para responder com mais agilidade "
             "e usar menos recursos que um modelo 7B. O modelo escolhido é baixado na primeira conversa. "
             "As respostas também podem ser faladas por uma voz neural local em português brasileiro "
-            "(download único de aproximadamente 64 MB)."
+            "(download único de aproximadamente 192 MB)."
         )
         intro.setWordWrap(True)
         intro.setStyleSheet("color: #b8cedb;")

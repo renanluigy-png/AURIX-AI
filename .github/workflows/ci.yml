@@ -46,24 +46,23 @@ jobs:
           import tempfile
           import wave
           from pathlib import Path
-          from aurix.speech import _load_voice
+          from aurix.speech import synthesize_to_wav
 
-          voice = _load_voice()
           target = Path(tempfile.gettempdir()) / "aurix-voice-smoke-test.wav"
-          with wave.open(str(target), "wb") as output:
-              voice.synthesize("Olá! Eu sou a AURIX. Estou funcionando localmente.", output)
+          synthesize_to_wav("Olá! Eu sou a AURIX. Estou funcionando localmente.", target)
           with wave.open(str(target), "rb") as generated:
-              assert generated.getnframes() > 0, "O Piper não gerou áudio."
-              assert generated.getframerate() == 22050, "Taxa de amostragem inesperada."
+              assert generated.getnframes() > 0, "O Kokoro não gerou áudio."
+              assert generated.getframerate() == 24000, "Taxa de amostragem inesperada."
+              assert generated.getnchannels() == 1, "O áudio precisa ser mono."
           target.unlink(missing_ok=True)
-          print("Piper pt-BR: síntese local concluída.")
+          print("Kokoro pt-BR: síntese neural local concluída.")
           '@ | Set-Content -Encoding utf8 smoke_voice.py
           python smoke_voice.py
 
       - name: Build self-contained Windows executable
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name AURIX-AI --collect-all PySide6 --collect-all openwakeword --collect-all onnxruntime --collect-all keyring --collect-all vosk --collect-all pynput --collect-all pyttsx3 --collect-all piper_plus --collect-all SpeechRecognition --hidden-import=pyttsx3.drivers.sapi5 --hidden-import=piper_plus --hidden-import=keyring.backends.Windows --hidden-import=onnxruntime run_aurix.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name AURIX-AI --collect-all PySide6 --collect-all openwakeword --collect-all onnxruntime --collect-all keyring --collect-all vosk --collect-all pynput --collect-all pyttsx3 --collect-all tugaphone --collect-all SpeechRecognition --hidden-import=pyttsx3.drivers.sapi5 --hidden-import=tugaphone --hidden-import=keyring.backends.Windows --hidden-import=onnxruntime run_aurix.py
           if (-not (Test-Path "dist/AURIX-AI.exe")) { throw "O executável do AURIX não foi gerado." }
 
       - name: Install Inno Setup

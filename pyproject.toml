@@ -23,7 +23,7 @@ dependencies = [
     "python-dotenv>=1.0,<2",
     "openai>=1.68,<3",
     "pynput>=1.7.7,<2",
-    "piper-plus[cpu]==2.0.2",
+    "tugaphone==0.2.1",
 ]
 
 [project.optional-dependencies]
