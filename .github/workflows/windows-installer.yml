@@ -44,8 +44,12 @@ jobs:
       - name: Build self-contained Windows application
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name AURIX-AI --collect-all PySide6 --collect-all openwakeword --collect-all onnxruntime --collect-all keyring --collect-all vosk --collect-all pynput --collect-all pyttsx3 --collect-all tugaphone --collect-all SpeechRecognition --hidden-import=pyttsx3.drivers.sapi5 --hidden-import=tugaphone --hidden-import=keyring.backends.Windows --hidden-import=onnxruntime run_aurix.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name AURIX-AI --collect-all openwakeword --collect-all onnxruntime --collect-all keyring --collect-all vosk --collect-all pynput --collect-all pyttsx3 --collect-all tugaphone --collect-all SpeechRecognition --hidden-import=pyttsx3.drivers.sapi5 --hidden-import=tugaphone --hidden-import=keyring.backends.Windows --hidden-import=onnxruntime run_aurix.py
           if (-not (Test-Path "dist/AURIX-AI.exe")) { throw "O executável do AURIX não foi gerado." }
+          & .\dist\AURIX-AI.exe --package-smoke-test
+          if ($LASTEXITCODE -ne 0) { throw "O teste de dependências do executável congelado falhou." }
+          $sizeMb = [math]::Round((Get-Item "dist/AURIX-AI.exe").Length / 1MB, 1)
+          Write-Host "Tamanho do AURIX-AI.exe: $sizeMb MB"
 
       - name: Build and validate MSIX package
         shell: pwsh
