@@ -22,6 +22,7 @@ from aurix.config import (
     configure_runtime_settings,
     is_start_with_windows_enabled,
     set_start_with_windows,
+    is_packaged_app,
 )
 from aurix.onboarding import SetupDialog
 from aurix.hud import HUDWindow
@@ -194,7 +195,8 @@ class AurixController(QObject):
         self.voice.start()
         self.hotkey.start()
         logging.info("AURIX desktop process started")
-        QTimer.singleShot(3200, self._check_for_updates)
+        if not is_packaged_app():
+            QTimer.singleShot(3200, self._check_for_updates)
 
         if not QSystemTrayIcon.isSystemTrayAvailable():
             self.window.show_hud()
@@ -220,15 +222,16 @@ class AurixController(QObject):
         setup_action.triggered.connect(self._open_setup_dialog)
         menu.addAction(setup_action)
 
-        self.autostart_action = QAction("Iniciar com o Windows", menu)
-        self.autostart_action.setCheckable(True)
-        self.autostart_action.setChecked(is_start_with_windows_enabled())
-        self.autostart_action.toggled.connect(self._toggle_autostart)
-        menu.addAction(self.autostart_action)
+        if not is_packaged_app():
+            self.autostart_action = QAction("Iniciar com o Windows", menu)
+            self.autostart_action.setCheckable(True)
+            self.autostart_action.setChecked(is_start_with_windows_enabled())
+            self.autostart_action.toggled.connect(self._toggle_autostart)
+            menu.addAction(self.autostart_action)
 
-        updates_action = QAction("Verificar atualizações", menu)
-        updates_action.triggered.connect(lambda: self._check_for_updates(manual=True))
-        menu.addAction(updates_action)
+            updates_action = QAction("Verificar atualizações", menu)
+            updates_action.triggered.connect(lambda: self._check_for_updates(manual=True))
+            menu.addAction(updates_action)
 
         menu.addSeparator()
         exit_action = QAction("Sair do AURIX", menu)
@@ -374,18 +377,22 @@ class AurixController(QObject):
             except RuntimeError:
                 logging.exception("Could not restart the voice worker after setup")
         self.window.set_voice_enabled(self.settings.wake_word_enabled)
-        if self.settings.start_with_windows:
-            ok, message = set_start_with_windows(True)
-            if not ok:
-                self.window.set_status(message)
+        if not is_packaged_app():
+            if self.settings.start_with_windows:
+                ok, message = set_start_with_windows(True)
+                if not ok:
+                    self.window.set_status(message)
+            else:
+                set_start_with_windows(False)
+            self.autostart_action.blockSignals(True)
+            self.autostart_action.setChecked(self.settings.start_with_windows)
+            self.autostart_action.blockSignals(False)
         else:
-            set_start_with_windows(False)
+            self.settings.start_with_windows = False
+            self.settings.save()
         self.voice_action.blockSignals(True)
         self.voice_action.setChecked(self.settings.wake_word_enabled)
         self.voice_action.blockSignals(False)
-        self.autostart_action.blockSignals(True)
-        self.autostart_action.setChecked(self.settings.start_with_windows)
-        self.autostart_action.blockSignals(False)
         self.window.set_response("Configurações atualizadas.")
         self.window.set_status("Pronto para ajudar.")
 
@@ -398,6 +405,14 @@ class AurixController(QObject):
 
     @Slot()
     def _check_for_updates(self, manual: bool = False) -> None:
+        if is_packaged_app():
+            if manual:
+                QMessageBox.information(
+                    self.window,
+                    "Atualizações do AURIX AI",
+                    "Esta versão é atualizada automaticamente pela Microsoft Store.",
+                )
+            return
         if getattr(self, "_shutdown_started", False):
             return
         self._manual_update_check = self._manual_update_check or manual
@@ -597,7 +612,10 @@ def main() -> None:
         SetupDialog(initial_settings).exec()
         initial_settings = Settings.load()
     configure_runtime_settings(initial_settings)
-    if initial_settings.start_with_windows:
+    if is_packaged_app():
+        initial_settings.start_with_windows = False
+        initial_settings.save()
+    elif initial_settings.start_with_windows:
         ok, message = set_start_with_windows(True)
         if not ok:
             logging.warning(message)
