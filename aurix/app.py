@@ -306,11 +306,10 @@ class AurixController(QObject):
             if self.settings.wake_word_enabled:
                 self.voice.set_enabled(True)
 
-    @staticmethod
-    def _speak(text: str) -> None:
+    def _speak(self, text: str) -> None:
         from aurix.speech import speak_text
 
-        speak_text(text)
+        speak_text(text, status_callback=self.voice.status_changed.emit)
 
     @Slot()
     def _listen_once_from_hud(self) -> None:

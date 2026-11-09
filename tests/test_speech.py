@@ -30,6 +30,7 @@ class SpeechHelperTests(unittest.TestCase):
             path.write_text(json.dumps({
                 "audio": {"sample_rate": 22050},
                 "phoneme_id_map": {"_": [0], "a": [1]},
+                "language": {"code": "pt_BR"},
             }), encoding="utf-8")
             self.assertTrue(is_valid_voice_config(path))
 
@@ -39,6 +40,7 @@ class SpeechHelperTests(unittest.TestCase):
             path.write_text(json.dumps({
                 "audio": {"sample_rate": 16000},
                 "phoneme_id_map": {},
+                "language": {"code": "pt_BR"},
             }), encoding="utf-8")
             self.assertFalse(is_valid_voice_config(path))
 

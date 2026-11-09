@@ -188,10 +188,10 @@ class AssistantBrain:
                     "messages": messages,
                     "tools": ollama_tools(),
                     "stream": False,
-                    "keep_alive": "5m",
+                    "keep_alive": os.getenv("AURIX_OLLAMA_KEEP_ALIVE", "2m"),
                     "options": {
                         "temperature": 0.25,
-                        "num_ctx": 4096,
+                        "num_ctx": int(os.getenv("AURIX_OLLAMA_NUM_CTX", "3072")),
                         "num_predict": 500,
                     },
                 },

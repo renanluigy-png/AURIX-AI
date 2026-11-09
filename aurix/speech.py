@@ -55,13 +55,16 @@ def is_valid_voice_config(path: Path) -> bool:
     """Check the small Piper config before handing it to the inference runtime."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return False
         audio = data.get("audio") or {}
         phonemes = data.get("phoneme_id_map") or {}
+        language = data.get("language") or {}
         return (
-            isinstance(data, dict)
-            and int(audio.get("sample_rate", 0)) == 22050
+            int(audio.get("sample_rate", 0)) == 22050
             and isinstance(phonemes, dict)
             and bool(phonemes)
+            and language.get("code") == "pt_BR"
         )
     except (OSError, ValueError, TypeError):
         return False
