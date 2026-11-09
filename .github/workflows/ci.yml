@@ -1,4 +1,4 @@
-name: Python checks
+name: Python and Windows package checks
 
 on:
   push:
@@ -18,3 +18,71 @@ jobs:
         run: python -m compileall -q aurix tests
       - name: Unit tests
         run: python -m unittest discover -s tests -v
+
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install application and packager
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install pyinstaller pyinstaller-hooks-contrib
+
+      - name: Smoke test Brazilian Portuguese neural voice
+        shell: pwsh
+        run: |
+          @'
+          import tempfile
+          import wave
+          from pathlib import Path
+          from aurix.speech import _load_voice
+
+          voice = _load_voice()
+          target = Path(tempfile.gettempdir()) / "aurix-voice-smoke-test.wav"
+          with wave.open(str(target), "wb") as output:
+              voice.synthesize("Olá! Eu sou a AURIX. Estou funcionando localmente.", output)
+          with wave.open(str(target), "rb") as generated:
+              assert generated.getnframes() > 0, "O Piper não gerou áudio."
+              assert generated.getframerate() == 22050, "Taxa de amostragem inesperada."
+          target.unlink(missing_ok=True)
+          print("Piper pt-BR: síntese local concluída.")
+          '@ | Set-Content -Encoding utf8 smoke_voice.py
+          python smoke_voice.py
+
+      - name: Build self-contained Windows executable
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name AURIX-AI --collect-all PySide6 --collect-all openwakeword --collect-all onnxruntime --collect-all keyring --collect-all vosk --collect-all pynput --collect-all pyttsx3 --collect-all piper_plus --collect-all SpeechRecognition --hidden-import=pyttsx3.drivers.sapi5 --hidden-import=piper_plus --hidden-import=keyring.backends.Windows --hidden-import=onnxruntime run_aurix.py
+          if (-not (Test-Path "dist/AURIX-AI.exe")) { throw "O executável do AURIX não foi gerado." }
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+          $iscc = Join-Path $programFilesX86 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found at $iscc" }
+          & $iscc installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path "dist-installer/AURIX-AI-Setup.exe")) { throw "O instalador do AURIX não foi criado." }
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AURIX-AI-Windows-PR-Installer
+          path: dist-installer/AURIX-AI-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
