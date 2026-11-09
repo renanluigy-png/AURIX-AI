@@ -32,7 +32,7 @@ class CoreWidget(QWidget):
         self.setFixedSize(158, 158)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self._timer = QTimer(self)
-        self._timer.setInterval(80)
+        self._timer.setInterval(140)
         self._timer.timeout.connect(self._advance)
 
     def set_mode(self, mode: str) -> None:
@@ -40,10 +40,11 @@ class CoreWidget(QWidget):
             mode = "idle"
         if self._mode != mode:
             self._mode = mode
+            self._timer.setInterval(140 if mode == "idle" else 80)
             self.update()
 
     def _advance(self) -> None:
-        self._angle = (self._angle + (1.0 if self._mode == "idle" else 2.0)) % 360
+        self._angle = (self._angle + (1.75 if self._mode == "idle" else 2.0)) % 360
         self.update()
 
     def showEvent(self, event) -> None:

@@ -4,15 +4,13 @@ Assistente pessoal de desktop para Windows, inspirado em interfaces sci-fi, com 
 
 ## Quero apenas instalar o aplicativo
 
-O AURIX é empacotado para Windows com seu runtime Python e bibliotecas. O computador não precisa ter Git ou Python instalados.
+A distribuição pública do AURIX está migrando para **Microsoft Store (MSIX)** para fornecer assinatura confiável, instalação limpa e atualizações gerenciadas. O pacote de produção só poderá ser publicado depois da reserva da identidade do aplicativo e da certificação no Partner Center.
 
-1. Abra [Releases](https://github.com/renanluigy-png/AURIX-AI/releases/latest).
-2. Baixe o arquivo `AURIX-AI-Setup.exe` da versão mais recente.
-3. Execute o instalador e siga as etapas.
+- Consulte o processo em [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+- Os pacotes MSIX de CI são artefatos de validação, não instaladores finais.
+- Não instale o executável/instalador unsigned dos artefatos de Pull Request. Em computadores com Smart App Control, arquivos sem assinatura confiável podem ser bloqueados.
 
-Depois de instalar uma versão que tenha o atualizador integrado, o AURIX consulta as publicações oficiais ao iniciar. Se houver uma versão mais nova, ele mostra um aviso e oferece baixar e abrir o instalador; a atualização só acontece depois da sua confirmação. É necessário estar conectado à internet. O atualizador aceita somente o endereço oficial e, quando o GitHub fornece SHA-256, verifica o hash antes de abrir o arquivo.
-
-[Ver os builds do Windows](https://github.com/renanluigy-png/AURIX-AI/actions/workflows/windows-installer.yml)
+[Ver os builds do MSIX no GitHub Actions](https://github.com/renanluigy-png/AURIX-AI/actions/workflows/windows-installer.yml)
 
 ## O que é o AURIX
 
@@ -47,6 +45,8 @@ Instale o [Ollama para Windows](https://ollama.com/download/windows) e mantenha-
 
 - A detecção da frase de ativação é feita localmente. O modelo pré-treinado incluído reconhece **“Hey Jarvis”**, e não somente “Jarvis”.
 - Para reconhecimento de fala em português sem enviar seu pedido a um serviço externo, escolha **Local**. Na primeira solicitação por voz, o AURIX baixa o modelo Vosk de português (aproximadamente 31 MB) para a pasta de dados do usuário.
+- A fala de resposta usa **Kokoro v1.0** com a voz brasileira feminina **Dora** e o fonemizador TugaPhone em pt-BR. Na primeira resposta falada, o modelo neural FP16 e o pacote de vozes (aproximadamente 192 MB no total) são baixados uma vez, verificados por SHA-256 e armazenados no perfil do usuário. A síntese e a reprodução acontecem localmente, sem enviar texto ou áudio para serviços externos.
+- Se o modelo neural não puder ser carregado, o AURIX tenta usar a voz instalada no Windows como alternativa.
 - A opção Google usa um serviço externo para transcrever o áudio capturado depois da ativação.
 - A escuta de ativação pode ser pausada no menu da bandeja. As permissões de microfone são controladas pelo Windows; a configuração inicial fornece um atalho para as opções de privacidade.
 - Fechar o HUD apenas o oculta. Para encerrar o processo, use **Sair do AURIX** no menu da bandeja.
@@ -55,7 +55,8 @@ Instale o [Ollama para Windows](https://ollama.com/download/windows) e mantenha-
 
 - **Ctrl + Alt + Espaço**: abrir o HUD.
 - **Ícone na bandeja**: abrir o HUD, pausar/retomar a escuta, configurar IA/voz, definir inicialização automática ou sair.
-- Ao chamar por voz, o AURIX mostra o HUD, transcreve o pedido, usa ferramentas quando necessário e fala a resposta.
+- Ao chamar por voz, o AURIX mostra o HUD, transcreve o pedido localmente com Vosk (na configuração padrão), conversa com o modelo Ollama local, usa ferramentas quando necessário e fala a resposta com Kokoro.
+- A voz neural é baixada sob demanda na primeira resposta falada; a detecção contínua “Hey Jarvis” começa desativada e pode ser pausada na bandeja.
 
 ## Desenvolvimento a partir do código-fonte
 
@@ -91,7 +92,7 @@ python -m unittest discover -s tests -v
 
 ## Estado do MVP
 
-Os testes automáticos verificam compilação sintática e a validação de ferramentas. Áudio real, permissões, instalação do Ollama e abertura dos programas precisam ser verificados em um Windows de destino. O modelo de ativação pré-treinado do openWakeWord tem licença CC BY-NC-SA 4.0; antes de redistribuir comercialmente, verifique a licença do modelo ou substitua-o por um modelo com licença adequada. O reconhecimento por voz depende do microfone e o uso da OpenAI API depende de uma chave válida. A automação foi mantida deliberadamente limitada por segurança.
+Os testes automáticos verificam compilação sintática e a validação de ferramentas. Áudio real, permissões, instalação do Ollama e abertura dos programas precisam ser verificados em um Windows de destino. O modelo de ativação pré-treinado do openWakeWord tem licença CC BY-NC-SA 4.0; antes de redistribuir comercialmente, verifique a licença do modelo ou substitua-o por um modelo com licença adequada. Os pesos Kokoro v1.0 são Apache-2.0, o fonemizador TugaPhone é Apache-2.0 e o código de inferência do projeto de referência Kokoro ONNX é MIT. Veja `THIRD_PARTY_NOTICES.md`. O reconhecimento por voz depende do microfone e o uso da OpenAI API depende de uma chave válida. A automação foi mantida deliberadamente limitada por segurança.
 
 ## Licença
 

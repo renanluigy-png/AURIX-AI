@@ -22,6 +22,7 @@ from aurix.config import (
     configure_runtime_settings,
     is_start_with_windows_enabled,
     set_start_with_windows,
+    is_packaged_app,
 )
 from aurix.onboarding import SetupDialog
 from aurix.hud import HUDWindow
@@ -194,7 +195,8 @@ class AurixController(QObject):
         self.voice.start()
         self.hotkey.start()
         logging.info("AURIX desktop process started")
-        QTimer.singleShot(3200, self._check_for_updates)
+        if not is_packaged_app():
+            QTimer.singleShot(3200, self._check_for_updates)
 
         if not QSystemTrayIcon.isSystemTrayAvailable():
             self.window.show_hud()
@@ -220,15 +222,16 @@ class AurixController(QObject):
         setup_action.triggered.connect(self._open_setup_dialog)
         menu.addAction(setup_action)
 
-        self.autostart_action = QAction("Iniciar com o Windows", menu)
-        self.autostart_action.setCheckable(True)
-        self.autostart_action.setChecked(is_start_with_windows_enabled())
-        self.autostart_action.toggled.connect(self._toggle_autostart)
-        menu.addAction(self.autostart_action)
+        if not is_packaged_app():
+            self.autostart_action = QAction("Iniciar com o Windows", menu)
+            self.autostart_action.setCheckable(True)
+            self.autostart_action.setChecked(is_start_with_windows_enabled())
+            self.autostart_action.toggled.connect(self._toggle_autostart)
+            menu.addAction(self.autostart_action)
 
-        updates_action = QAction("Verificar atualizações", menu)
-        updates_action.triggered.connect(lambda: self._check_for_updates(manual=True))
-        menu.addAction(updates_action)
+            updates_action = QAction("Verificar atualizações", menu)
+            updates_action.triggered.connect(lambda: self._check_for_updates(manual=True))
+            menu.addAction(updates_action)
 
         menu.addSeparator()
         exit_action = QAction("Sair do AURIX", menu)
@@ -306,24 +309,10 @@ class AurixController(QObject):
             if self.settings.wake_word_enabled:
                 self.voice.set_enabled(True)
 
-    @staticmethod
-    def _speak(text: str) -> None:
-        try:
-            import pyttsx3
+    def _speak(self, text: str) -> None:
+        from aurix.speech import speak_text
 
-            engine = pyttsx3.init()
-            engine.setProperty("rate", 178)
-            for voice in engine.getProperty("voices"):
-                name = (getattr(voice, "name", "") or "").casefold()
-                language = " ".join(str(item) for item in getattr(voice, "languages", [])).casefold()
-                if "brazil" in name or "portugu" in name or "pt_br" in language:
-                    engine.setProperty("voice", voice.id)
-                    break
-            engine.say(text[:1200])
-            engine.runAndWait()
-            engine.stop()
-        except Exception:
-            logging.exception("Text-to-speech failed")
+        speak_text(text, status_callback=self.voice.status_changed.emit)
 
     @Slot()
     def _listen_once_from_hud(self) -> None:
@@ -388,18 +377,22 @@ class AurixController(QObject):
             except RuntimeError:
                 logging.exception("Could not restart the voice worker after setup")
         self.window.set_voice_enabled(self.settings.wake_word_enabled)
-        if self.settings.start_with_windows:
-            ok, message = set_start_with_windows(True)
-            if not ok:
-                self.window.set_status(message)
+        if not is_packaged_app():
+            if self.settings.start_with_windows:
+                ok, message = set_start_with_windows(True)
+                if not ok:
+                    self.window.set_status(message)
+            else:
+                set_start_with_windows(False)
+            self.autostart_action.blockSignals(True)
+            self.autostart_action.setChecked(self.settings.start_with_windows)
+            self.autostart_action.blockSignals(False)
         else:
-            set_start_with_windows(False)
+            self.settings.start_with_windows = False
+            self.settings.save()
         self.voice_action.blockSignals(True)
         self.voice_action.setChecked(self.settings.wake_word_enabled)
         self.voice_action.blockSignals(False)
-        self.autostart_action.blockSignals(True)
-        self.autostart_action.setChecked(self.settings.start_with_windows)
-        self.autostart_action.blockSignals(False)
         self.window.set_response("Configurações atualizadas.")
         self.window.set_status("Pronto para ajudar.")
 
@@ -412,6 +405,14 @@ class AurixController(QObject):
 
     @Slot()
     def _check_for_updates(self, manual: bool = False) -> None:
+        if is_packaged_app():
+            if manual:
+                QMessageBox.information(
+                    self.window,
+                    "Atualizações do AURIX AI",
+                    "Esta versão é atualizada automaticamente pela Microsoft Store.",
+                )
+            return
         if getattr(self, "_shutdown_started", False):
             return
         self._manual_update_check = self._manual_update_check or manual
@@ -567,7 +568,31 @@ class AurixController(QObject):
         self.app.quit()
 
 
+def _run_package_smoke_test() -> None:
+    """Verify runtime imports from the frozen executable without opening the UI."""
+    import numpy
+    import onnxruntime
+    import sounddevice
+    import vosk
+    import speech_recognition
+    import pyttsx3.drivers.sapi5
+    import keyring.backends.Windows
+    from openwakeword import utils as wakeword_utils
+    from openwakeword.model import Model
+    from tugaphone import TugaPhonemizer
+
+    if not onnxruntime.get_available_providers():
+        raise RuntimeError("Nenhum provider ONNX está disponível no pacote.")
+    phonemizer = TugaPhonemizer(postag_engine="dummy")
+    if not phonemizer.phonemize_sentence("Olá, AURIX.", "pt-BR").strip():
+        raise RuntimeError("TugaPhone não conseguiu carregar os recursos pt-BR.")
+
+
 def main() -> None:
+    if "--package-smoke-test" in sys.argv[1:]:
+        _run_package_smoke_test()
+        return
+
     _configure_logging()
     app = QApplication(sys.argv)
     app.setApplicationName("AURIX AI")
@@ -611,7 +636,10 @@ def main() -> None:
         SetupDialog(initial_settings).exec()
         initial_settings = Settings.load()
     configure_runtime_settings(initial_settings)
-    if initial_settings.start_with_windows:
+    if is_packaged_app():
+        initial_settings.start_with_windows = False
+        initial_settings.save()
+    elif initial_settings.start_with_windows:
         ok, message = set_start_with_windows(True)
         if not ok:
             logging.warning(message)

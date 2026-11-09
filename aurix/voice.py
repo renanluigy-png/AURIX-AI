@@ -38,7 +38,7 @@ class VoiceService(QThread):
         self._stop_event = threading.Event()
         self._activity_event = threading.Event()
         self._manual_event = threading.Event()
-        self._queue: queue.Queue = queue.Queue(maxsize=64)
+        self._queue: queue.Queue = queue.Queue(maxsize=16)
         self._enabled = False
         self._enabled_lock = threading.Lock()
         self._vosk_model = None
@@ -107,16 +107,9 @@ class VoiceService(QThread):
         )
 
     def run(self) -> None:
-        try:
-            import numpy as np
-            import sounddevice as sd
-        except ImportError as exc:
-            self.error.emit(
-                "O módulo de áudio não foi carregado. Reinstale a versão mais recente do AURIX. "
-                f"Detalhe: {exc}"
-            )
-            return
-
+        # Import heavy audio libraries only when voice is actually enabled/requested.
+        np = None
+        sd = None
         wake_model = None
         idle_status_sent = False
         self.status_changed.emit("Voz pronta · clique em FALAR ou ative Hey Jarvis")
@@ -126,6 +119,9 @@ class VoiceService(QThread):
             wake_enabled = self.is_enabled()
 
             if not wake_enabled and not manual_requested:
+                # Drop ONNX sessions while continuous listening is paused.
+                if wake_model is not None:
+                    wake_model = None
                 if not idle_status_sent:
                     self.status_changed.emit("Voz pronta · clique em FALAR ou ative Hey Jarvis")
                     idle_status_sent = True
@@ -134,6 +130,20 @@ class VoiceService(QThread):
                     continue
                 self._activity_event.wait(0.35)
                 continue
+
+            if np is None or sd is None:
+                try:
+                    import numpy as numpy_module
+                    import sounddevice as sounddevice_module
+
+                    np = numpy_module
+                    sd = sounddevice_module
+                except ImportError as exc:
+                    self.error.emit(
+                        "O módulo de áudio não foi carregado. Reinstale a versão mais recente do AURIX. "
+                        f"Detalhe: {exc}"
+                    )
+                    return
 
             idle_status_sent = False
 

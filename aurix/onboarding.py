@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from aurix.config import Settings
+from aurix.config import Settings, is_packaged_app
 
 
 class SetupDialog(QDialog):
@@ -47,8 +47,9 @@ class SetupDialog(QDialog):
         intro = QLabel(
             "O AURIX usa um modelo de IA generativa real para conversar e selecionar ferramentas. "
             "Para uso local, o Qwen 2.5 3B é o perfil recomendado para responder com mais agilidade "
-            "e usar menos recursos que um modelo 7B. O modelo escolhido é baixado na primeira conversa; "
-            "o aplicativo permanece utilizável durante esse processo."
+            "e usar menos recursos que um modelo 7B. O modelo escolhido é baixado na primeira conversa. "
+            "As respostas também podem ser faladas por uma voz neural local em português brasileiro "
+            "(download único de aproximadamente 192 MB)."
         )
         intro.setWordWrap(True)
         intro.setStyleSheet("color: #b8cedb;")
@@ -97,12 +98,19 @@ class SetupDialog(QDialog):
         form.addRow("Reconhecimento de voz", self.speech_provider)
         root.addLayout(form)
 
+        self.tts_enabled = QCheckBox(
+            "Falar as respostas em voz alta · voz neural local pt-BR"
+        )
+        self.tts_enabled.setChecked(settings.tts_enabled)
+        root.addWidget(self.tts_enabled)
+
         self.wake_word = QCheckBox("Concordo em deixar o AURIX ouvir “Hey Jarvis” em segundo plano")
         self.wake_word.setChecked(settings.wake_word_enabled)
         root.addWidget(self.wake_word)
 
         self.start_windows = QCheckBox("Iniciar o AURIX automaticamente com o Windows")
         self.start_windows.setChecked(settings.start_with_windows)
+        self.start_windows.setVisible(not is_packaged_app())
         root.addWidget(self.start_windows)
 
         privacy = QLabel(
@@ -298,8 +306,9 @@ class SetupDialog(QDialog):
         self.settings.ollama_model = self.ollama_model.text().strip() or "qwen2.5:3b"
         self.settings.performance_migrated = True
         self.settings.speech_provider = str(self.speech_provider.currentData())
+        self.settings.tts_enabled = self.tts_enabled.isChecked()
         self.settings.wake_word_enabled = self.wake_word.isChecked()
-        self.settings.start_with_windows = self.start_windows.isChecked()
+        self.settings.start_with_windows = self.start_windows.isChecked() if not is_packaged_app() else False
         self.settings.first_run_complete = True
         self.settings.save()
         self.accept()
@@ -310,8 +319,9 @@ class SetupDialog(QDialog):
 
     def _continue_without_ai(self) -> None:
         self.settings.wake_word_enabled = self.wake_word.isChecked()
-        self.settings.start_with_windows = self.start_windows.isChecked()
+        self.settings.start_with_windows = self.start_windows.isChecked() if not is_packaged_app() else False
         self.settings.speech_provider = str(self.speech_provider.currentData())
+        self.settings.tts_enabled = self.tts_enabled.isChecked()
         self.settings.llm_provider = "none"
         self.settings.first_run_complete = True
         self.settings.performance_migrated = True
