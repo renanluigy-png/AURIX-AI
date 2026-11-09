@@ -568,7 +568,31 @@ class AurixController(QObject):
         self.app.quit()
 
 
+def _run_package_smoke_test() -> None:
+    """Verify runtime imports from the frozen executable without opening the UI."""
+    import numpy
+    import onnxruntime
+    import sounddevice
+    import vosk
+    import speech_recognition
+    import pyttsx3.drivers.sapi5
+    import keyring.backends.Windows
+    from openwakeword import utils as wakeword_utils
+    from openwakeword.model import Model
+    from tugaphone import TugaPhonemizer
+
+    if not onnxruntime.get_available_providers():
+        raise RuntimeError("Nenhum provider ONNX está disponível no pacote.")
+    phonemizer = TugaPhonemizer(postag_engine="dummy")
+    if not phonemizer.phonemize_sentence("Olá, AURIX.", "pt-BR").strip():
+        raise RuntimeError("TugaPhone não conseguiu carregar os recursos pt-BR.")
+
+
 def main() -> None:
+    if "--package-smoke-test" in sys.argv[1:]:
+        _run_package_smoke_test()
+        return
+
     _configure_logging()
     app = QApplication(sys.argv)
     app.setApplicationName("AURIX AI")
