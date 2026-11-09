@@ -293,6 +293,15 @@ def _release_engine() -> None:
     _LOGGER.info("Kokoro neural voice released from memory after idle timeout.")
 
 
+def _cancel_engine_release() -> None:
+    """Cancel the idle timer while synthesis is active."""
+    global _engine_release_timer
+    with _engine_lock:
+        if _engine_release_timer is not None:
+            _engine_release_timer.cancel()
+            _engine_release_timer = None
+
+
 def _schedule_engine_release() -> None:
     global _engine, _engine_release_timer
     try:
@@ -303,10 +312,8 @@ def _schedule_engine_release() -> None:
     except ValueError:
         keep_alive = ENGINE_KEEP_ALIVE_SECONDS
 
+    _cancel_engine_release()
     with _engine_lock:
-        if _engine_release_timer is not None:
-            _engine_release_timer.cancel()
-            _engine_release_timer = None
         if keep_alive == 0:
             _engine = None
             threading.Thread(target=gc.collect, daemon=True).start()
@@ -408,26 +415,36 @@ def synthesize_to_wav(
     import numpy as np
 
     with _synthesis_lock:
-        samples = _make_audio(normalized, status_callback)
-        samples = np.asarray(samples, dtype=np.float32).reshape(-1)
-        samples = np.nan_to_num(samples, nan=0.0, posinf=0.0, neginf=0.0)
-        samples = np.clip(samples, -1.0, 1.0)
-        pcm = (samples * 32767.0).astype(np.int16)
-
-        target = Path(destination)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        temporary = target.with_name(target.name + ".part")
+        # A prior call may have left the idle timer running. Cancel it before
+        # touching the cached ONNX session so it cannot release the model mid-run.
+        _cancel_engine_release()
         try:
-            with wave.open(str(temporary), "wb") as output:
-                output.setnchannels(1)
-                output.setsampwidth(2)
-                output.setframerate(SAMPLE_RATE)
-                output.writeframes(pcm.tobytes())
-            os.replace(temporary, target)
-        finally:
-            temporary.unlink(missing_ok=True)
+            samples = _make_audio(normalized, status_callback)
+            samples = np.asarray(samples, dtype=np.float32).reshape(-1)
+            samples = np.nan_to_num(samples, nan=0.0, posinf=0.0, neginf=0.0)
+            samples = np.clip(samples, -1.0, 1.0)
+            pcm = (samples * 32767.0).astype(np.int16)
 
-    _schedule_engine_release()
+            target = Path(destination)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            temporary = target.with_name(target.name + ".part")
+            try:
+                with wave.open(str(temporary), "wb") as output:
+                    output.setnchannels(1)
+                    output.setsampwidth(2)
+                    output.setframerate(SAMPLE_RATE)
+                    output.writeframes(pcm.tobytes())
+                os.replace(temporary, target)
+            finally:
+                temporary.unlink(missing_ok=True)
+        finally:
+            # Also release a model initialized just before phonemization/inference
+            # failed, otherwise fallback TTS could leave ~200 MB resident forever.
+            with _engine_lock:
+                engine_ready = _engine is not None
+            if engine_ready:
+                _schedule_engine_release()
+
     return target
 
 
