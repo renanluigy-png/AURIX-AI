@@ -10,7 +10,12 @@ $ProgressPreference = "SilentlyContinue"
 $identityName = $env:AURIX_MSIX_IDENTITY_NAME
 $publisher = $env:AURIX_MSIX_PUBLISHER
 $publisherDisplayName = $env:AURIX_MSIX_PUBLISHER_DISPLAY_NAME
-$identityConfigured = -not [string]::IsNullOrWhiteSpace($identityName) -and -not [string]::IsNullOrWhiteSpace($publisher)
+$identityNameConfigured = -not [string]::IsNullOrWhiteSpace($identityName)
+$publisherConfigured = -not [string]::IsNullOrWhiteSpace($publisher)
+if ($identityNameConfigured -xor $publisherConfigured) {
+    throw "Configure AURIX_MSIX_IDENTITY_NAME e AURIX_MSIX_PUBLISHER juntos, usando os valores do Partner Center."
+}
+$identityConfigured = $identityNameConfigured -and $publisherConfigured
 
 if ([string]::IsNullOrWhiteSpace($identityName)) { $identityName = "AURIXAI.PublisherIdentityRequired" }
 if ([string]::IsNullOrWhiteSpace($publisher)) { $publisher = "CN=AURIX-PUBLISHER-IDENTITY-REQUIRED" }
